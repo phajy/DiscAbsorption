@@ -74,10 +74,7 @@ for n in eachindex(EvtsFiles)
             run(`rmfgen rmfset=$EPNbkgRMFName spectrumset=$EPNbkgSpecName `)
             run(`arfgen arfset=$EPNsrcARFName spectrumset=$EPNsrcSpecName withrmfset=yes rmfset=$EPNsrcRMFName withbadpixcorr=yes badpixlocation=$EPNtimeFiltName setbackscale=yes`)
             run(`arfgen arfset=$EPNbkgARFName spectrumset=$EPNbkgSpecName withrmfset=yes rmfset=$EPNbkgRMFName withbadpixcorr=yes badpixlocation=$EPNtimeFiltName setbackscale=yes`)
-            #run(`specgroup spectrumset=$EPNsrcSpecName mincounts=20`)
         end
         cd("..")
     end
 end
-
-

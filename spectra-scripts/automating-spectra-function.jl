@@ -13,7 +13,7 @@
     OutDir = ".",
     mincounts = 20)
 
-The above are chanable arguments as well as the default values they take. 
+The above are changeable arguments as well as the default values they take. 
 heasoft and ESAS must also be initialised before running this program
 
 """ 

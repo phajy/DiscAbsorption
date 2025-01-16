@@ -1,77 +1,44 @@
 
 ##########  REMOVE THE FILES INDICATED BEFORE RUNNING  ##########
-
 using FITSIO
+using Dates
 cd("/data/typhon2/DariusM/XMM_Data/IRAS13224-3809/FluxSplitSpectra")
-mkdir("JoinedSpectra")
-cd("JoinedSpectra")
-highfiles = filter(x -> occursin("time", x), readdir("../highflux", join=true))
-midfiles = filter(x -> occursin("time", x), readdir("../midflux", join=true))
-lowfiles = filter(x -> occursin("time", x), readdir("../lowflux", join=true))
-flux = ["high","mid","low"]
-region = ["src_";"bkg_"]
-file = ["spec";;"rmf";;"arf"]
-
-matrix = region .* file
-
-for i in axes(matrix,1), j in axes(matrix,2)
-    w = open("highflux_"*matrix[i,j]*".txt", "w")
-    for k in eachindex(highfiles)
-        highpref = chop(highfiles[k], tail=14)
-        write(w, highpref*matrix[i,j]*".fits")
-        write(w,"\n")
-    end
-    close(w)
-
-    w = open("midflux_"*matrix[i,j]*".txt", "w")
-    for k in eachindex(midfiles)
-        midpref = chop(midfiles[k], tail=14)
-        write(w, midpref*matrix[i,j]*".fits")
-        write(w,"\n")
-    end
-    close(w)
-
-    w = open("lowflux_"*matrix[i,j]*".txt", "w")
-    for k in eachindex(lowfiles)
-        lowpref = chop(lowfiles[k], tail=14)
-        write(w, lowpref*matrix[i,j]*".fits")
-        write(w,"\n")
-    end
-    close(w)
+dirs = readdir()
+for dir in dirs
+#dir = dirs[1]
+cd(dir)
+srcfiles = filter(x -> occursin("src_spec.fits", x), readdir()) 
+w = open("spec_list.txt", "w")
+arflist = []
+arfweight = []
+for file in srcfiles
+    #file = srcfiles[1]
+    f = FITS(file)
+    header = read_header(f[1])
+    exposure = (Dates.seconds((Dates.DateTime(header["DATE-END"]) - Dates.DateTime(header["DATE-OBS"]))))
+    backfile = chop(file,tail=13)*"bkg_spec.fits"
+    ancrfile = chop(file,tail=13)*"src_arf.fits"
+    respfile = chop(file,tail=13)*"src_rmf.fits"
+    run(`fthedit $file keyword=BACKFILE operation=add value=$backfile comment='Name of background file'`)
+    run(`fthedit $file keyword=ANCRFILE operation=add value=$ancrfile comment='Name of ARF file'`)
+    run(`fthedit $file keyword=RESPFILE operation=add value=$respfile comment='Name of responce file'`)
+    write(w, file)
+    write(w,"\n")
+    push!(arflist,ancrfile)
+    push!(arfweight,exposure)
 end
-outlist = readdir()
-highbkgarf = outlist[1]
-highbkgrmf = outlist[2]
-highbkgspec = outlist[3]
-highsrcarf = outlist[4]
-highsrcrmf = outlist[5]
-highsrcspec = outlist[6]
-lowbkgarf = outlist[7]
-lowbkgrmf = outlist[8]
-lowbkgspec = outlist[9]
-lowsrcarf = outlist[10]
-lowsrcrmf = outlist[11]
-lowsrcspec = outlist[12]
-midbkgarf = outlist[13]
-midbkgrmf = outlist[14]
-midbkgspec = outlist[15]
-midsrcarf = outlist[16]
-midsrcrmf = outlist[17]
-midsrcspec = outlist[18]
-
-directory = "/data/typhon2/DariusM/XMM_Data/IRAS13224-3809/FluxSplitSpectra"
-highflux = readlines(highsrcspec)
-#for i in eachindex(highflux)
-i = 1 
-file = highflux[i]
-bkg = directory*chop(readlines(highbkgspec)[i], head=2)
-arf = directory*chop(readlines(highsrcarf)[i], head=2)
-rmf = directory*chop(readlines(highsrcrmf)[i], head=2)
-run(`grppha $file "chkey RESPFILE $rmf" "chkey ANCRFILE $arf chkey BACKFILE=$bkg"`)
-#end
-# 
-#run(`addspec infil=$highsrcspec outfil="highflux_src_spec.fits" qaddrmf="yes" qsubback="yes"`)
-
-#run(`epicspeccombine pha=$highsrcspec bkg=$highbkgspec rmf=$highsrcrmf arf=$highsrcarf filepha=highflux_src_spec.fits filersp=highflux_src_rsp.fits`)
-#run(`epicspeccombine pha=$midsrcspec bkg=$midbkgspec rmf=$midsrcrmf arf=$midsrcarf filepha=midflux_src_spec.fits filersp=midflux_src_rsp.fits`)
-#run(`epicspeccombine pha=$lowsrcspec bkg=$lowbkgspec rmf=$lowsrcrmf arf=$lowsrcarf filepha=lowflux_src_spec.fits filersp=lowflux_src_rsp.fits`)
+close(w)
+arfweight = string.(arfweight/sum(arfweight))
+w = open("arf_list.txt", "w")
+for i in eachindex(arflist)
+    write(w, arflist[i])
+    write(w, " ")
+    write(w, arfweight[i])
+    write(w,"\n")
+end
+close(w)
+run(`addspec infil="spec_list.txt" outfil="joined_spec" qaddrmf="yes" qsubback="yes"`)
+run(`addarf @arf_list.txt out_ARF=joined_spec.arf`)
+run(`grppha joined_spec.pha joined_spec_grp.pha comm="group min 20 & exit"`)
+cd("..")
+end
