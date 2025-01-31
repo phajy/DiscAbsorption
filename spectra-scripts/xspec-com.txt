@@ -1,0 +1,39 @@
+xspec
+data joined_spec_grp.pha
+ignore 0.-1.0
+ignore 10.-**
+cpd /ps
+setp e
+mo tbabs*(relconv*warmabs*xillver+relconv*xillver+powerlaw)
+/*
+newpar 1 0.169
+newpar 8 8 ,  400.0
+newpar 11 , 3 ,
+newpar 40 0.0658
+newpar 45 0.0658
+newpar 60 , 3 ,
+newpar 61 0.0658
+freeze 1
+thaw 2 
+thaw 3
+thaw 4
+thaw 6
+thaw 8 
+thaw 32
+thaw 46
+thaw 54
+thaw 62
+newpar 2 = 65
+newpar 3 =  65
+newpar 4 = 8*0.99
+newpar 41 = 65
+newpar 42 = 32
+newpar 44 = 11
+newpar 46 = 6 
+newpar 49 = 65
+newpar 50 = 65
+newpar 51 = 55*0.99
+newpar 52 = 5
+newpar 54 = 8
+newpar 57 = 65
+newpar 62 = 6
