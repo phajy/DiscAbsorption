@@ -40,7 +40,10 @@ function SpectralFitting.invoke!(output, domain, model::OurTestModel)
     m2 = XS_Relconv(Index1, Index2, r_br_g, 0.0, model.incl, Rin_ms, Rout_ms, 0.0)
     
     invokemodel!(our_output, our_domain, m1)
-    invokemodel!(our_output, our_domain, m2)
+    # convolution only works if there is something to convolve with (it crashes without the following condition)
+    if maximum(our_output) > 0.0
+        invokemodel!(our_output, our_domain, m2)
+    end
 
     # return the result from the origin domain excluding the extended bins
     output .= our_output[length(our_low_bins)+1:length(our_low_bins)+length(output)]
