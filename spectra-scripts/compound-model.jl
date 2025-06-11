@@ -28,12 +28,16 @@ struct DiscAbsModel{T} <: AbstractSpectralModel{T,Additive}
     # relconv
     index::T
     a::T
+    r_in::T
     r_abs::T
+    limb::T
+    # power law
+    K_pl::T
 end
 
 function DiscAbsModel(;
     # xillver
-    K = FitParam(1.0e-3, frozen = false, lower_limit = 0.0, upper_limit = 1.0),
+    K = FitParam(1.0e-5, frozen = false, lower_limit = 0.0, upper_limit = 1.0),
     Γ = FitParam(2.0, frozen = false, lower_limit = 1.0, upper_limit = 5.0),
     A_Fe = FitParam(1.0, frozen = true, lower_limit = 0.0, upper_limit = 10.0),
     logξ = FitParam(1.0, frozen = false, lower_limit = 0.0, upper_limit = 4.0),
@@ -41,15 +45,18 @@ function DiscAbsModel(;
     θ = FitParam(30.0, frozen = false, lower_limit = 4.0, upper_limit = 86.0),
     # relconv
     index = FitParam(3.0, frozen = true, lower_limit = 0.0, upper_limit = 10.0),
-    a = FitParam(0.0, frozen = 0.0, lower_limit = 0.0, upper_limit = 0.998),
-    # note r_abs in units of r_ISCO
+    a = FitParam(0.998, frozen = true, lower_limit = 0.0, upper_limit = 0.998),
+    # note r_in and r_abs in units of r_ISCO
+    r_in = FitParam(1.0, frozen = true, lower_limit = 1.0, upper_limit = 10.0),
     r_abs = FitParam(3.0, frozen = false, lower_limit = 1.0, upper_limit = 10.0),
+    limb = FitParam(0.0, frozen = true, lower_limit = 0.0, upper_limit = 1.0),
+    # power law
+    K_pl = FitParam(1.0e-1, frozen = false, lower_limit = 0.0, upper_limit = 1.0)
     )
-    DiscAbsModel(K, Γ, A_Fe, logξ, density, θ, index, a, r_abs)
+    DiscAbsModel(K, Γ, A_Fe, logξ, density, θ, index, a, r_in, r_abs, limb, K_pl)
 end
 
 function SpectralFitting.invoke!(output, domain, model::DiscAbsModel)
-
     # extend domain so we can do the convolution
     # this will extend the domain from 10^-1 keV to 10^1.5 keV which should be fine
     Δ = 0.005
@@ -60,21 +67,38 @@ function SpectralFitting.invoke!(output, domain, model::DiscAbsModel)
     our_domain = vcat(our_low_bins, domain, our_high_bins)
     our_output = zeros(length(our_domain)-1)
 
+    # INNER DISC MODEL
+
     # setup first xillver model
     m1 = XillverD5(K = model.K, Γ = model.Γ, A_Fe = model.A_Fe, logXi = model.logξ, density = model.density, inclination = model.θ)
-
     # setup first relconv model
-    m2_r_in = ISCO(model.a)
-    m2_r_out = model.r_abs * ISCO(model.a)
+    m2_r_in = model.r_in * 1.235
+    # should be * ISCO(model.a)
+    m2_r_out = model.r_abs * 1.235
+    # should be * ISCO(model.a)
     m2_r_break = 0.5*(m2_r_in + m2_r_out)
-    m2 = XS_Relconv(model.index, model.index, m2_r_break, model.a, model.θ, m2_r_in, m2_r_out, 0.0)
-    
-    # evalueat first model which is relconv(xillver) for the inner disc
+    m2 = XS_Relconv(model.index, model.index, m2_r_break, model.a, model.θ, m2_r_in, m2_r_out, model.limb)
+    # evaluate first model which is relconv(xillver) for the inner disc
     invokemodel!(our_output, our_domain, m1)
     # convolution only works if there is something to convolve with (it crashes without the following condition)
     if maximum(our_output) > 0.0
         invokemodel!(our_output, our_domain, m2)
     end
+    # save the inner disc output
+    inner_disc_output = copy(our_output)
+
+    # POWER LAW MODEL
+
+    # setup power law model
+    m3 = XS_PowerLaw(K = model.K_pl, a = model.Γ)
+    # evaluate power law model
+    invokemodel!(our_output, our_domain, m3)
+    # save the power law output
+    pl_output = copy(our_output)
+
+    # ADD UP THE MODELS
+    out_output = copy(inner_disc_output)
+    our_output .= out_output .+ pl_output
 
     # return the result from the origin domain excluding the extended bins
     output .= our_output[length(our_low_bins)+1:length(our_low_bins)+length(output)]
@@ -82,4 +106,4 @@ end
 
 energy = collect(range(1.0, 10.0, 150))
 m = invokemodel(energy, DiscAbsModel())
-plot(energy[1:end-1],m./diff(energy),xlim=(2.0, 8.0),xlabel="Energy (keV)")
+plot(energy[1:end-1], m./diff(energy), xscale=:log10, yscale=:log10, xlim=(2.0, 8.0), xlabel="Energy (keV)")

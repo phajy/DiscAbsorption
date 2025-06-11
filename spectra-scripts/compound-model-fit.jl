@@ -4,17 +4,10 @@ using SpectralFitting, XSPECModels, Plots, Relxill
 
 include("compound-model.jl")
 
-function ISCO(a::Float64)
-    Z_1 = 1.0+((1-a^2)^(1/3))*((1+a)^(1/3)+(1-a)^(1/3))
-    Z_2 = (3*a^2+Z_1^2)^(1/2)
-    if a >= 0 
-        r = 3+Z_2-((3-Z_1)*(3+Z_1+2*Z_2))^(1/2)
-    else
-        r = 3+Z_2+((3-Z_1)*(3+Z_1+2*Z_2))^(1/2)
-    end
-end
-
-model = XS_PowerLaw() + OurTestModel()
+model = DiscAbsModel()
+model.logξ.frozen = true
+model.r_abs.frozen = true
+model
 
 #Load the data 
 
