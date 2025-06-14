@@ -1,12 +1,18 @@
 # example fit of compound model to a spectrum
 
-using SpectralFitting, XSPECModels, Plots, Relxill
+using SpectralFitting, XSPECModels, Plots, Relxill, Warmabs
 
 include("compound-model.jl")
 
 model = DiscAbsModel()
-model.logξ.frozen = true
-model.r_abs.frozen = true
+model.A_Fe = 3.5
+model.logξ.frozen = false
+model.θ = 70.0
+model.θ.frozen = false
+model.index.frozen = false
+model.r_abs.frozen = false
+model.column = 1.9
+model.abs_logξ = 4.0
 model
 
 #Load the data 
@@ -22,12 +28,14 @@ ARF = joinpath(DATADIR, "joined_spec.arf")
 data = OGIPDataset(spectra,background=BKG,response=RMF,ancillary=ARF)
 regroup!(data) ; normalize!(data) ; drop_bad_channels!(data) ; mask_energies!(data, 1.0, 10.0)
 
+plot(data, xscale=:log10, yscale=:log10)
+
 #define the fitting problem
 
 prob = FittingProblem(model => data)
 
 #Fit the model to the data
-result = fit(prob, LevenbergMarquadt())
+result = fit(prob, LevenbergMarquadt(); autodiff = :finite)
 update_model!(model, result)
 
 #plot the results 
