@@ -41,12 +41,13 @@ ARF = joinpath(PATH[i], "joined_spec.arf")
 data = OGIPDataset(SPEC,background=BKGD,response=RMF,ancillary=ARF)
 regroup!(data) ; normalize!(data) ; drop_bad_channels!(data) ; mask_energies!(data, 1.0, 10.0)
 
-data.spectrum.data .*= 10e9
-data.spectrum.errors .*= 10e9
+data.spectrum.data .*= 10e6
+data.spectrum.errors .*= 10e6
 
 
 #define composite model
-comp_model  = PhotoelectricAbsorption()*(XS_Relconv()(AutoCache(XS_WarmAbsorber())*XillverD5())+XS_Relconv()(XillverD5())+PowerLaw())
+comp_model  = PhotoelectricAbsorption()*(XS_Relconv()(AutoCache(XS_WarmAbsorber(),abstol=1e-9)*XillverD5())+XS_Relconv()(XillverD5())+PowerLaw())
+#comp_model  = PhotoelectricAbsorption()*(XS_Relconv()(XS_WarmAbsorber()*XillverD5())+XS_Relconv()(XillverD5())+PowerLaw())
 
 #patcher function which sets apropriate radii ranges
 function patcher!(p)
@@ -58,7 +59,8 @@ function patcher!(p)
     p.c1.r_break = (p.c1.inner_r+p.c1.outer_r)/2
     p.c2.r_break = (p.c2.inner_r+p.c2.outer_r)/2
     
-    @show p.c1.inner_r, p.c1.outer_r, p.c2.outer_r
+    @show p.a3.K
+    @show p.m2.column, p.m2.rlogxi
 end
 
 #define the fitting problem on the patched model 
@@ -137,6 +139,8 @@ function setup_prob_and_model(prob, patched_comp_model)
     patched_comp_model.m2.Feabund.frozen = false
     patched_comp_model.m2.model.redshift = 0.0658
     patched_comp_model.m2.redshift.frozen = true
+    patched_comp_model.m2.model.column = 1
+    patched_comp_model.m2.model.rlogxi = 4
     end
 
     #bind disk density
@@ -160,12 +164,15 @@ for (name, p) in zip(SpectralFitting.parameter_names(patched_comp_model), Spectr
         p.value = 1.0
     end
 end
-
+patched_comp_model.a3.K = 1e5
+patched_comp_model.a3.K.upper_limit = 1e10
 details(prob)
 
 #Fit the model to the data
 
-result = fit(prob, LevenbergMarquadt(), verbose = true)
+result = fit(prob, LevenbergMarquadt(), verbose = true, max_iter = 10)
+
+
 
 begin
     all_params = SpectralFitting.update_free_parameters!(result.config.parameter_cache, result.u)
@@ -179,7 +186,8 @@ end
 setup_prob_and_model(prob, patched_comp_model)
 details(prob)
 
-result = fit(prob, LevenbergMarquadt(), verbose = true)
+result = fit(prob, LevenbergMarquadt(), verbose = true, max_iter = 10)
+
 
 begin
     all_params = SpectralFitting.update_free_parameters!(result.config.parameter_cache, result.u)
