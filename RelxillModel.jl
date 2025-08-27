@@ -181,30 +181,23 @@ gamodel = invokemodel(energy, patched_model)
 
 plot!(energy[1:end-1], gamodel, yscale=:log10, xscale=:log10)
 
-# use MCMC to fit data
+# use MCMC to fit two power laws to data for illustrative purposes
 using StatsPlots
 using Turing
 
-model = XS_Relxill()
-model.K.upper_limit = 10.0
-model.index1.frozen = false
-model.index1.upper_limit = 10.0
-model.z = 0.0658
-model.logxi.frozen = false
-model.Afe.frozen = false
-model.Afe.upper_limit = 10.0
-model.refl_frac.upper_limit = 10.0
+model = PowerLaw() + PowerLaw()
+model.a1.a = 3.5
+model.a1.K = 100.0
+model.a2.a = 1.8
+model.a2.K = 300.0
 model
 
 @model function mcmc_model(objective, stddev, f)
-    K ~ Normal(2.0, 1.0)
-    index1 ~ Normal(3.0, 2.0)
-    θ_obs ~ truncated(Normal(60.0, 15.0); lower = 5, upper = 85)
-    Gamma ~ Normal(2.0, 0.5)
-    logxi ~ Normal(2.0, 1.0)
-    AFe ~ Normal(1.0, 2.0)
-    refl_frac ~ Normal(2.0, 1.0)
-    pred = f(K, index1, θ_obs, Gamma, logxi, AFe, refl_frac)
+    K1 ~ truncated(Normal(100.0, 10.0); lower = 0.0)
+    a1 ~ Normal(3.5, 0.5)
+    K2 ~ truncated(Normal(300.0, 10.0); lower = 0.0)
+    a2 ~ Normal(1.8, 0.5)
+    pred = f(K1, a1, K2, a2)
     return objective ~ MvNormal(pred, stddev)
 end
 
@@ -216,4 +209,54 @@ mm = mcmc_model(
     get_invoke_wrapper_single(config),
 )
 
-chain = sample(mm, NUTS(), 5_000, autodiff=:finite)
+chain = sample(mm, NUTS(), 5_000)
+
+plot(chain)
+
+import PairPlots, Makie, CairoMakie
+
+table = (; # named tuple syntax
+    K1 = vec(chain["K1"]),
+    a1 = vec(chain["a1"]),
+    K2 = vec(chain["K2"]),
+    a2 = vec(chain["a2"])
+)
+
+PairPlots.pairplot(table)
+
+# use MCMC to fit data (does not work)
+# using StatsPlots
+# using Turing
+
+# model = XS_Relxill()
+# model.K.upper_limit = 10.0
+# model.index1.frozen = false
+# model.index1.upper_limit = 10.0
+# model.z = 0.0658
+# model.logxi.frozen = false
+# model.Afe.frozen = false
+# model.Afe.upper_limit = 10.0
+# model.refl_frac.upper_limit = 10.0
+# model
+
+# @model function mcmc_model(objective, stddev, f)
+#     K ~ Normal(2.0, 1.0)
+#     index1 ~ Normal(3.0, 2.0)
+#     θ_obs ~ truncated(Normal(60.0, 15.0); lower = 5, upper = 85)
+#     Gamma ~ Normal(2.0, 0.5)
+#     logxi ~ Normal(2.0, 1.0)
+#     AFe ~ Normal(1.0, 2.0)
+#     refl_frac ~ Normal(2.0, 1.0)
+#     pred = f(K, index1, θ_obs, Gamma, logxi, AFe, refl_frac)
+#     return objective ~ MvNormal(pred, stddev)
+# end
+
+# config = FittingConfig(FittingProblem(model => data))
+
+# mm = mcmc_model(
+#     get_objective_single(config),
+#     sqrt.(get_objective_variance_single(config)),
+#     get_invoke_wrapper_single(config),
+# )
+
+# chain = sample(mm, NUTS(), 5_000, autodiff=:finite)
