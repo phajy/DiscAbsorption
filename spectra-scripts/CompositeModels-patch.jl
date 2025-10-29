@@ -172,6 +172,7 @@ details(prob)
 
 result = fit(prob, LevenbergMarquadt(), verbose = true, max_iter = 10)
 
+SpectralFitting.support_units(result)
 
 
 begin

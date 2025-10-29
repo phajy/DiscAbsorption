@@ -12,7 +12,7 @@ function ISCO(a::Float64)
 end
 
 # ensures reclonv gets positive non zero fluxes by setting nay such values to system ϵ
-function SpectralFitting._invoke_guard!(output, domain, model::XS_Relconv{<:Number})
+#= function SpectralFitting._invoke_guard!(output, domain, model::XS_Relconv{<:Number})
     for i in eachindex(output)
         if output[i] <= 0
             output[i] = eps(Float64)
@@ -20,7 +20,7 @@ function SpectralFitting._invoke_guard!(output, domain, model::XS_Relconv{<:Numb
         #throw("BAD")
     end
     SpectralFitting.invoke!(output, domain, model)
-end
+end =#
 
 #load and initialises data
 begin
@@ -45,15 +45,31 @@ begin
 end
 #model = XS_Relconv()(XillverD5()+GaussianLine())
 
-model = XS_Relxill()+XS_Relconv()(GaussianLine())
-
-function patcher!(p)
-    p.c1.a = clamp(p.c1.a, 0, 0.998)
-    p.c1.inner_r = ISCO(p.c1.a)
-    p.c1.r_break = (p.c1.inner_r+p.c1.outer_r)/2    
+begin
+Base.@kwdef struct Constant{T} <: AbstractSpectralModel{T,Multiplicative}
+    K::T = FitParam(1.0, frozen = true)
 end
 
-patched_model = ParameterPatch(model; patch = patcher!)
+function SpectralFitting.invoke!(output, input, model::Constant)
+    output .= model.K
+end
+end
+
+inner_disk = XS_Relxill()+Constant(K = FitParam(-1.0,frozen = true))*(XS_Relconv()(GaussianLine()))
+outer_disk = XS_Relxill()
+comp_model  = PhotoelectricAbsorption()*(inner_disk+outer_disk)
+
+function patcher!(p)
+    p.a1.a = clamp(p.a1.a, 0, 0.998)
+    p.a3.a = clamp(p.a3.a, 0, 0.998)
+    p.a1.inner_r = ISCO(p.a1.a)
+    p.a1.outer_r = p.a1.inner_r > p.a1.outer_r ? p.a1.inner_r*1.1 : p.a1.outer_r
+    p.a3.inner_r = p.a1.outer_r
+    p.a1.r_break = (p.a1.inner_r+p.a1.outer_r)/2
+    p.a3.r_break = (p.a3.inner_r+p.a3.outer_r)/2
+    
+end
+patched_model = ParameterPatch(comp_model; patch = patcher!)
 
 begin
     prob = FittingProblem(patched_model => data)
@@ -87,48 +103,55 @@ end
 
 FreezeAll!(patched_model)
 
-patched_model.a1.K.frozen = false
-details(prob)
+begin
+    bind!(prob, (1, :a1, :index1) => (1, :c1, :index1) => (1, :a3, :index1))
+    bind!(prob, (1, :a1, :index2) => (1, :c1, :index2) => (1, :a3, :index2))
+    bind!(prob, (1, :a1, :r_break) => (1, :c1, :r_break))
+    bind!(prob, (1, :a1, :a) => (1, :c1, :a) => (1, :a3, :a))
+    bind!(prob, (1, :a1, :θ_obs) => (1, :c1, :θ_obs) => (1, :a3, :θ_obs))
+    bind!(prob, (1, :a1, :inner_r) => (1, :c1, :inner_r))
+    bind!(prob, (1, :a1, :outer_r) => (1, :c1, :outer_r))
+    bind!(prob, (1, :a1, :outer_r) => (1, :a3, :inner_r))
+    bind!(prob, (1, :a1, :z) => (1, :a3, :z))
+    bind!(prob, (1, :a1, :Gamma) => (1, :a3, :Gamma))
+    bind!(prob, (1, :a1, :logxi) => (1, :a3, :logxi))    
+    bind!(prob, (1, :a1, :Afe) => (1, :a3, :Afe))
+    bind!(prob, (1, :a1, :Ecut) => (1, :a3, :Ecut))
+    bind!(prob, (1, :a1, :refl_frac) => (1, :a3, :refl_frac))
+    
+    patched_model.a1.inner_r = ISCO(0.998)
+    patched_model.a1.θ_obs = 70
+    patched_model.a1.z = 0.0658
+    
+    patched_model.a2.μ = 6.8
+    patched_model.a2.σ = 0.001
 
+    patched_model.a1.outer_r = 6
+end
+
+patched_model.a1.K.frozen = false
+patched_model.a3.K.frozen = false
+
+details(prob)
+##
 result = fit(prob, LevenbergMarquadt(), verbose = true)#, max_iter = 10)
 
 ApplyResult(patched_model,result)
-
-patched_model.a1.θ_obs = 60
-patched_model.a1.inner_r = ISCO(0.998)
-patched_model.a1.z = 0.0658
-
-bind!(prob, (1, :a1, :index1) => (1, :c1, :index1))
-bind!(prob, (1, :a1, :index2) => (1, :c1, :index2))
-bind!(prob, (1, :a1, :r_break) => (1, :c1, :r_break))
-bind!(prob, (1, :a1, :a) => (1, :c1, :a))
-bind!(prob, (1, :a1, :θ_obs) => (1, :c1, :θ_obs))
-bind!(prob, (1, :a1, :inner_r) => (1, :c1, :inner_r))
-bind!(prob, (1, :a1, :outer_r) => (1, :c1, :outer_r))
-
-patched_model.a2.K = -1
-patched_model.a2.K.upper_limit = 0
-patched_model.a2.K.lower_limit = -Inf64
-patched_model.a2.μ = 6.8
 
 patched_model.a1.a.frozen = false
 patched_model.a1.θ_obs.frozen = false
 patched_model.a1.Gamma.frozen = false
 patched_model.a1.logxi.frozen = false
 patched_model.a1.Afe.frozen = false
+patched_model.a1.refl_frac.frozen = false
 
-patched_model.a2.K.frozen = false
-patched_model.a2.σ = 1e-4
+
+##
 
 details(prob)
-#begin
-
-result = fit(prob, LevenbergMarquadt(), verbose = true)#, max_iter = 10)
+result = fit(prob, LevenbergMarquadt(), verbose = true, max_iter = 100)
 
 ApplyResult(patched_model, result)
-
-
-
 
 begin
 i=1
@@ -138,32 +161,3 @@ COLORS_model = ["#00a676","#0052cd","#a619c5"]
 plot(data,xlims=(1.0, 10.0),yscale=:log10,xscale=:log10,color=COLORS_point[i],markerstrokecolor=COLORS_bars[i])
 plot!(result, xlims=(1.0, 10.0),yscale = :log10, xscale = :log10,color=COLORS_model[i])
 end 
-
-function calc_residuals(result)
-    # select which result we want (only have one, but for generalisation to multi-model fits)
-    r = result[1]
-    y = calculate_objective!(r, r.u)
-    obj, var = get_objective(r), get_objective_variance(r)
-    @. (obj - y) / sqrt(var)
-end
-
-domain = SpectralFitting.plotting_domain(data)
-
-rp = hline([0], linestyle = :dash, legend = false)
-plot!(rp,domain, calc_residuals(result), seriestype = :stepmid)
-
-details(prob)
-
-
-ApplyResult(patched_model, result)
-patched_model.a1.Gamma = 1
-energy= collect(range(1,12,1000))
-fullmodel = invokemodel(energy, patched_model)
-
-plot!(energy[1:end-1],fullmodel,yscale=:log10,xscale=:log10)
-
-patched_model.a1.K = 0
-
-Gaussian =  invokemodel(energy, patched_model)
-
-plot!(energy[1:end-1],Gaussian,yscale=:log10,xscale=:log10)

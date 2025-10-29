@@ -1,19 +1,21 @@
 using SpectralFitting, XSPECModels, Relxill, Warmabs, Plots,  LaTeXStrings
 
 begin
-column = 8.0
-abs_xi = 2.8
+column = 4.0
+abs_xi = 1.0
 disc_xi = 1.0
 disc_dens = 17
 Γ = 2.5
 index = 1.0
 a = 0.998
 r_abs = 3.0*ISCO(a)
-θ = 70 
+θ = 70.0
 A_Fe = 1.0
-K_in = 0.024
-K_out = 0.008
+K_in = 0.05
+K_out = 0.009
 K_pl = 15000.0
+K_abs = -1000000
+line_width = 0.1
 end
 
 begin
@@ -39,7 +41,7 @@ function SpectralFitting._invoke_guard!(output, domain, model::XS_Relconv{<:Numb
 end
 
 
-inner_disk_abs = XS_Relconv()(AutoCache(XS_WarmAbsorber(),abstol=1e-5)*XillverD5())
+inner_disk_abs = XS_Relconv()(GaussianLine()+XillverD5())
 outer_disk = XS_Relconv()(XillverD5())
 comp_model_abs  = PhotoelectricAbsorption()*(inner_disk_abs+outer_disk+PowerLaw())
 
@@ -64,19 +66,18 @@ patched_comp_model_abs.c1.a = a
 patched_comp_model_abs.c1.θ_obs = θ
 patched_comp_model_abs.c1.inner_r = ISCO(a)
 patched_comp_model_abs.c1.outer_r = r_abs
+6.9
+patched_comp_model_abs.a1.K = K_abs
+patched_comp_model_abs.a1.μ.frozen = true
+ patched_comp_model_abs.a1.σ = line_width
+ 
 
-patched_comp_model_abs.m2.model.column = column
-patched_comp_model_abs.m2.model.rlogxi = abs_xi
-patched_comp_model_abs.m2.model.redshift = 0.0658
-patched_comp_model_abs.m2.model.vturb = 200
-patched_comp_model_abs.m2.model.Feabund = A_Fe
-
-patched_comp_model_abs.a1.K = K_in
-patched_comp_model_abs.a1.Γ = Γ
-patched_comp_model_abs.a1.A_Fe = A_Fe
-patched_comp_model_abs.a1.logXi = disc_xi
-patched_comp_model_abs.a1.density = disc_dens
-patched_comp_model_abs.a1.inclination = θ
+patched_comp_model_abs.a2.K = K_in
+patched_comp_model_abs.a2.Γ = Γ
+patched_comp_model_abs.a2.A_Fe = A_Fe
+patched_comp_model_abs.a2.logXi = disc_xi
+patched_comp_model_abs.a2.density = disc_dens
+patched_comp_model_abs.a2.inclination = θ
 
 patched_comp_model_abs.c2.index1 = index
 patched_comp_model_abs.c2.index2 = index
@@ -86,15 +87,15 @@ patched_comp_model_abs.c2.θ_obs = θ
 patched_comp_model_abs.c2.inner_r = r_abs
 patched_comp_model_abs.c2.outer_r = 400
 
-patched_comp_model_abs.a2.K = K_out
-patched_comp_model_abs.a2.Γ = Γ
-patched_comp_model_abs.a2.A_Fe = A_Fe
-patched_comp_model_abs.a2.logXi = disc_xi
-patched_comp_model_abs.a2.density = disc_dens
-patched_comp_model_abs.a2.inclination = θ
+patched_comp_model_abs.a3.K = K_out
+patched_comp_model_abs.a3.Γ = Γ
+patched_comp_model_abs.a3.A_Fe = A_Fe
+patched_comp_model_abs.a3.logXi = disc_xi
+patched_comp_model_abs.a3.density = disc_dens
+patched_comp_model_abs.a3.inclination = θ
 
-patched_comp_model_abs.a3.K = K_pl
-patched_comp_model_abs.a3.a = Γ
+patched_comp_model_abs.a4.K = K_pl
+patched_comp_model_abs.a4.a = Γ
 
 patched_comp_model_abs
 
@@ -150,16 +151,14 @@ patched_comp_model
 full_model = invokemodel(energy,patched_comp_model)
 end
 begin
-p = plot(energy[1:end-1], energy[1:end-1].*energy[1:end-1].*full_model_abs./diff(energy), linewidth=5 ,formatter=(_...) -> "", ylabel=L"Counts (s$^{-1}$keV$^{-1}$)",color="#4dfa00",xscale=:log10, yscale=:log10, xlim=(2, 12.0), xlabel="Energy (keV)", xticks = ([2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], ["2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"]), label="Model with absorber", legend = :bottomleft,legendfontcolor="white",tickfontcolor="white",guidefontcolor="white",background_color= RGBA(1, 1, 1, 0),background_color_outside = RGBA(1, 1, 1, 0))
-
-    plot!(energy[1:end-1], energy[1:end-1].*energy[1:end-1].*full_model./diff(energy), linewidth=5,color="#cd1e69", label="Model without absorber")
-    
+    plot(energy[1:end-1], energy[1:end-1].*energy[1:end-1].*full_model./diff(energy), linewidth=5,color="#cd1e69", label="Model without absorber")
+    plot!(energy[1:end-1], energy[1:end-1].*energy[1:end-1].*full_model_abs./diff(energy), linewidth=5 ,formatter=(_...) -> "", ylabel=L"Counts (s$^{-1}$keV$^{-1}$)",color="#4dfa00",xscale=:log10, yscale=:log10, xlim=(2, 12.0), xlabel="Energy (keV)", xticks = ([2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], ["2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"]), label="Model with absorber", legend = :bottomleft,legendfontcolor="white",tickfontcolor="white",guidefontcolor="white",background_color= RGBA(1, 1, 1, 0),background_color_outside = RGBA(1, 1, 1, 0))
     patched_comp_model_abs.a1.K = 0.0
 	patched_comp_model_abs.a2.K = 0.0
-	patched_comp_model_abs.a3.K = K_pl
+	patched_comp_model_abs.a3.K = 0.0
+    patched_comp_model_abs.a4.K = K_pl
 	inner_model_abs = invokemodel(energy, patched_comp_model_abs)
-	plot!(energy[1:end-1], energy[1:end-1].*energy[1:end-1].*inner_model_abs./diff(energy), linewidth=5, color="#6500ff",label = "Power law")
+	plot!(energy[1:end-1], energy[1:end-1].*energy[1:end-1].*inner_model_abs./diff(energy), linewidth=5,color="#6500ff",label = "Power law")
 	plot!(x_foreground_color_axis=:white, y_foreground_color_axis=:white)
     plot!(x_foreground_color_border=:white, y_foreground_color_border=:white)
-    p
 end

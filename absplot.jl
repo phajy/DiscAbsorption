@@ -1,15 +1,5 @@
 using SpectralFitting, XSPECModels, Relxill, Warmabs, Plots, LaTeXStrings
 
-function ISCO(a::Float64)
-    Z_1 = 1.0+((1-a^2)^(1/3))*((1+a)^(1/3)+(1-a)^(1/3))
-    Z_2 = (3*a^2+Z_1^2)^(1/2)
-    if a >= 0 
- r = 3+Z_2-((3-Z_1)*(3+Z_1+2*Z_2))^(1/2)
-    else
- r = 3+Z_2+((3-Z_1)*(3+Z_1+2*Z_2))^(1/2)
-    end
-end
-
 function SpectralFitting._invoke_guard!(output, domain, model::XS_Relconv{<:Number})
     for i in eachindex(output)
         if output[i] <= 0
@@ -22,12 +12,12 @@ end
 
 
 
-#comp_model_abs = AutoCache(XS_WarmAbsorber(),abstol=1e-9)
+comp_model_abs = AutoCache(XS_WarmAbsorber(),abstol=1e-9)
 
-using Colors
+#= using Colors
 c1 = colorant"red"
 c2 = colorant"green"
-colors = range(c1, stop=c2, length=21)
+colors = range(c1, stop=c2, length=21) =#
 
 begin
     comp_model_abs  = PhotoelectricAbsorption()*(XS_Relconv()(AutoCache(XS_WarmAbsorber(),abstol=1e-9)*XillverD5())+PowerLaw())
@@ -65,9 +55,45 @@ comp_model_abs.a2.a = Γ
 
 end
 
-begin
-plot(x_foreground_color_axis=:white,x_foreground_color_border=:white, y_foreground_color_border=:white, y_foreground_color_axis=:white,ylabel=L"Counts (s$^{-1}$keV$^{-1}$)",xscale=:log10, yscale=:log10, xlim=(2, 12.0), xlabel="Energy (keV)", xticks = ([2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], ["2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"]), legend = :bottomright, legendfontcolor="white",tickfontcolor="white",guidefontcolor="white",background_color= RGBA(1, 1, 1, 0),background_color_outside = RGBA(1, 1, 1, 0))
+#begin
+function DarkPlot(;
+        xscale=:log10,
+        yscale=:log10,
+        xlabel="Energy (keV)",
+        ylabel=L"Counts (s$^{-1}$keV$^{-1}$)",
+        xlim=(2, 12.0),
+        xticks=([2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],["2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"]),
+        x_foreground_color_axis=:white, 
+        y_foreground_color_axis=:white, 
+        x_foreground_color_border=:white, 
+        y_foreground_color_border=:white, 
+        legend = :bottomright,
+        legendfontcolor="white",
+        tickfontcolor="white",
+        guidefontcolor="white",
+        background_color=RGBA(1, 1, 1, 0),
+        background_color_outside=RGBA(1, 1, 1, 0))   
+    plot(
+        xscale=xscale,
+        yscale=yscale,
+        xlabel=xlabel,
+        ylabel=ylabel,
+        xlim=xlim,
+        xticks=xticks,
+        x_foreground_color_axis=x_foreground_color_axis, 
+        y_foreground_color_axis=y_foreground_color_axis, 
+        x_foreground_color_border=x_foreground_color_border, 
+        y_foreground_color_border=y_foreground_color_border, 
+        legend = legend,
+        legendfontcolor=legendfontcolor,
+        tickfontcolor=tickfontcolor,
+        guidefontcolor=guidefontcolor,
+        background_color=background_color,
+        background_color_outside=background_color_outside)
+end
 
+DarkPlot()
+        
 full_model_abs = invokemodel(energy,comp_model_abs) 
 plot!(energy[1:end-1], energy[1:end-1].*energy[1:end-1].*full_model_abs./diff(energy), linewidth=1, color="green", label="full model")
 
@@ -80,8 +106,7 @@ comp_model_abs.a1.K = 0
 PL_model_abs = invokemodel(energy,comp_model_abs) 
 plot!(energy[1:end-1], energy[1:end-1].*energy[1:end-1].*PL_model_abs./diff(energy), linewidth=1, color="red", label="power law")
 
-end
-()
+#end
 
 #= k=21
 begin
