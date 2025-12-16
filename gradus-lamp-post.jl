@@ -19,7 +19,7 @@ end
 
 # add a default keyword constructor
 function LampPost(;K = FitParam(1.0),
-    h = FitParam(2.,lower_limit = 2.0, upper_limit = 20., frozen = false),
+    h = FitParam(2.,lower_limit = 1, upper_limit = 20., frozen = false),
     E = FitParam(1.0,lower_limit = 1., upper_limit = 10., frozen = true),
     R_in = FitParam(-1.,lower_limit= -Inf,frozen = true),
     R_out = FitParam(400., lower_limit=-Inf, frozen = true), 
@@ -29,7 +29,7 @@ function LampPost(;K = FitParam(1.0),
 end
 
 function SpectralFitting.invoke!(output, domain, model::LampPost)
-    g_domain = copy(domain) ./ model.E
+    g_domain = copy(domain)
     
     m = KerrMetric(;a = 0.998)
     x_obs = SVector(0.0, 1e3, deg2rad(model.θ), 0.0)
@@ -51,12 +51,41 @@ end
 
 #numrₑ = number of transfer functions 
 #plane = PolarPlane(GeometricGrid(); Nr = 1000, Nθ = 1000, r_max = 50.0)
+using Colors
+plot()
+color = range(colorant"red", stop=colorant"blue", length=10)
+Hrange = collect(logrange(1.5,10.,10))
+energies = collect(logrange(0.1,1.5,500))
+for i in eachindex(Hrange)
+        model = LampPost(h=FitParam(Hrange[i])) 
+        spec = invokemodel(energies,model)
+        digs = round(Hrange[i],digits=2)
+        global p = plot!(energies[1:end-1],spec,label = "h = $digs",color = color[i] )
+end
+display(p)
+##
 
-model = LampPost() 
+N=10
+color = range(colorant"red", stop=colorant"blue", length=N)
 
+specmodel = XillverD5()
 
-energies = collect(logrange(1.,80.,500))
-spec = invokemodel(energies,model)
-plot(energies[1:end-1],spec) 
+convmodel = GaussianLine(μ = FitParam(1.))
+#convmodel = LampPost()
+energies = collect(logrange(0.1,50.,500))
 
-line_convolution = AsConvolution(GaussianLine())
+plot(legend=false,energies[1:end-1],invokemodel(energies,specmodel)./sum(energies[1:end-1].*invokemodel(energies,specmodel)),yscale=:log10,xscale=:log10,color="black",label="unconvolved")
+
+sigrange = collect(logrange(0.01,0.1,N))
+for i in eachindex(sigrange)
+    s = sigrange[i]
+    convmodel.σ = s
+    convolution_model = AsConvolution(convmodel)
+    reflecmodel = convolution_model(XillverD5())
+    spec = invokemodel(energies,reflecmodel)
+    area = sum(energies[1:end-1].*spec)
+    S = round(s,digits = ndigits(N)+1)
+    global p = plot!(energies[1:end-1],spec./area,yscale=:log10,xscale=:log10,color=color[i],label = "σ = $S")
+end
+display(p)
+
