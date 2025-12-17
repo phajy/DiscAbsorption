@@ -68,20 +68,19 @@ display(p)
 N=10
 color = range(colorant"red", stop=colorant"blue", length=N)
 
-specmodel = XillverD5()
+specmodel = XillverD5(logXi=FitParam(3.2),A_Fe=FitParam(4.),density=FitParam(16.))
 
 convmodel = GaussianLine(μ = FitParam(1.))
 #convmodel = LampPost()
 energies = collect(logrange(0.1,50.,500))
-
-plot(legend=false,energies[1:end-1],invokemodel(energies,specmodel)./sum(energies[1:end-1].*invokemodel(energies,specmodel)),yscale=:log10,xscale=:log10,color="black",label="unconvolved")
+plot(legend=false,energies[1:end-1],invokemodel(energies,specmodel)./sum(energies[1:end-1].*invokemodel(energies,specmodel)),yscale=:log10,xscale=:log10,color="black",label="unconvolved",xlims=(0.5,12))
 
 sigrange = collect(logrange(0.01,0.1,N))
 for i in eachindex(sigrange)
     s = sigrange[i]
     convmodel.σ = s
     convolution_model = AsConvolution(convmodel)
-    reflecmodel = convolution_model(XillverD5())
+    reflecmodel = convolution_model(specmodel)
     spec = invokemodel(energies,reflecmodel)
     area = sum(energies[1:end-1].*spec)
     S = round(s,digits = ndigits(N)+1)
