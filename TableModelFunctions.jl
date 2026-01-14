@@ -1,4 +1,4 @@
-using SpectralFitting, CFITSIO
+using SpectralFitting, CFITSIO, ProgressMeter
 module TableModels
 using SpectralFitting
 
@@ -224,7 +224,7 @@ SPECTRA_colsdef = [("PARAMVAL", string(length(TableModel.free_params))*"E", ""),
 fits_create_binary_tbl(f, prod(length.(params)), SPECTRA_colsdef, "SPECTRA")
 fits_write_col(f, 1, 1, 1, vec(stack(iter_params)))
 
-for j in eachindex(iter_params)
+@showprogress for j in eachindex(iter_params)
     ps = iter_params[j]
     for i in eachindex(ps)
         symbol_name = split(TableModel.free_params[i].name,".")
@@ -245,8 +245,21 @@ fits_write_key(f,"HDUVERS", "1.0.0", "format version")
 close(f)
 
 end
+
+include("LaorModel.jl")
+
+
+model.θ.lower_limit = 5
+model.θ.upper_limit = 85
+
+model.a.frozen = false
+model.a.lower_limit = 2
+model.a.upper_limit = 4
+
 model
 
 TableModel = MakeTable(model)
-0TableModel.free_params
+
+TableModel
+
 OutputTable(model,TableModel)

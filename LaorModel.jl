@@ -17,7 +17,7 @@ end
 # add a default keyword constructor
 function Laor(;K = FitParam(1.0),
     E = FitParam(6.4,lower_limit = 1., upper_limit = 10., frozen = true),
-    a = FitParam(3.,frozen=true),
+    a = FitParam(3.,lower_limit = 0., upper_limit = 10., frozen=true),
     R_in = FitParam(-1.,lower_limit= -Inf,frozen = true),
     R_out = FitParam(400., lower_limit=-Inf, frozen = true), 
     θ = FitParam(30.,upper_limit=90))
@@ -44,6 +44,9 @@ end
 
 model = Laor()
 
-energies = collect(logrange(0.1,70,1000))
+energies = collect(logrange(0.1,70,4000))
+@time begin 
 spec = invokemodel(energies,model)
-plot(spec,energies[1:end-1])
+end
+
+plot(energies[1:end-1],spec)
