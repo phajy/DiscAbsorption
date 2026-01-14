@@ -46,4 +46,13 @@ model = Laor()
 
 energies = collect(logrange(0.1,70,1000))
 spec = invokemodel(energies,model)
-plot(spec,energies[1:end-1])
+plot(energies[1:end-1],spec)
+
+include("TableModelFunctions.jl")
+
+model = PowerLaw()+GaussianLine()
+Sp
+
+TableModel = MakeTable(model)
+TableModel.free_params
+OutputTable(model,TableModel)

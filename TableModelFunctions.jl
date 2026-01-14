@@ -1,4 +1,4 @@
-using SpectralFitting, CFITSIO
+using SpectralFitting, XSPECModels, CFITSIO
 module TableModels
 using SpectralFitting
 
@@ -229,7 +229,11 @@ for j in eachindex(iter_params)
     for i in eachindex(ps)
         symbol_name = split(TableModel.free_params[i].name,".")
         if length(symbol_name) == 2
-            setproperty!(getproperty(model,Symbol(symbol_name[1])), Symbol(symbol_name[2]), ps[i])
+            try #THIS TRY CATCH IS NEW SINCE THE PULL REQUEST REMEMBER TO UPDATE IT
+                setproperty!(getproperty(model,Symbol(symbol_name[1])), Symbol(symbol_name[2]), ps[i])
+            catch
+                setproperty!(getproperty(getproperty(model,Symbol(symbol_name[1])),:model), Symbol(symbol_name[2]), ps[i])
+            end
         else
             setproperty!(model,Symbol(symbol_name[1]),ps[i])
         end
@@ -245,8 +249,4 @@ fits_write_key(f,"HDUVERS", "1.0.0", "format version")
 close(f)
 
 end
-model
 
-TableModel = MakeTable(model)
-0TableModel.free_params
-OutputTable(model,TableModel)
