@@ -1,46 +1,26 @@
 using SpectralFitting, XSPECModels, Relxill, Warmabs, CFITSIO, Plots
 
+include("gradus-lamp-post.jl")
 # as an example I'm initiating a model and setting some parameters. The upper and lower limits set will be the high and low values for which spectra will be created 
-model = XillverD5()+PowerLaw()
+convmodel = LampPost(    
+    h = FitParam(1.5,lower_limit = 1, upper_limit = 20., frozen = false),
+    E = FitParam(1.0,lower_limit = 1., upper_limit = 10., frozen = true),
+    R_in = FitParam(-1.,lower_limit= -Inf,frozen = true),
+    R_out = FitParam(400., lower_limit=-Inf, frozen = true), 
+    θ = FitParam(30.,lower_limit=7,upper_limit=85, frozen = true),
+    a = FitParam(0.998,lower_limit=-0.998,upper_limit=0.998, frozen = true))
 
-begin
-    model.a1.Γ.lower_limit = 2
-    model.a1.Γ.upper_limit = 4.5
+specmodel = XillverD5(
+    Γ = FitParam(1.5,lower_limit = 1, upper_limit = 20., frozen = false),
+    A_Fe = FitParam(1.0,lower_limit = 1., upper_limit = 10., frozen = false),
+    logXi = FitParam(3.,lower_limit= 0., upper_limit = 4.,frozen = false),
+    density = FitParam(17., lower_limit=15., upper_limit=19., frozen = false), 
+    inclination = FitParam(30.,lower_limit=7,upper_limit=85, frozen = true))
 
-    model.a1.A_Fe.lower_limit = 0.5
-    model.a1.A_Fe.upper_limit = 10
 
-    model.a1.logXi.lower_limit = 0
-    model.a1.logXi.upper_limit = 4
+convolution_model = AsConvolution(convmodel)
+model = convolution_model(specmodel)
 
-    model.a1.density.frozen = true 
-
-    model.a1.inclination = 70
-    model.a1.inclination.frozen = true
-
-    model.a2.a.lower_limit = 2
-    model.a2.a.upper_limit = 4.5
-
-    model
-end
-#=begin
-    model.Γ.lower_limit = 2
-    model.Γ.upper_limit = 4.5
-    model.A_Fe.lower_limit = 0.5
-    model.A_Fe.upper_limit = 10
-
-    model.logXi.lower_limit = 0
-    model.logXi.upper_limit = 4
-
-    model.density.frozen = true 
-
-    model.inclination = 70
-    model.inclination.frozen = true
-    model
-end=#
-# the function to 'make' the table would start here 
-#first setting all the parameters needed to be called as mutable struct that can later be adjusted 
-model
 full_model_vals , model_names = SpectralFitting._all_parameters_with_names(model)
 
 if typeof(model).name.name == :CompositeModel
@@ -65,14 +45,14 @@ frozen_param_values = filter(x -> !SpectralFitting.isfree(x), full_model_vals)
 
 #function MakeTable(model,outName)
     SPECTRA_Units = "photons/cm^2/s"
-    Out_path = "test_model"
+    Out_path = "LampPostXillverD5.fits"
     REDSHIFT = "F"
     ESCALE = "F"
-    logged = [0, 0, 0, 0]
-    NumbVals = [20,10,5,5]
-    ENERGIES_Nbins = 4000
-    E_Min = 3.0
-    E_Max = 10.0
+    logged = [0, 0, 0, 0, 0]
+    NumbVals = [10,10,10,10,10]
+    ENERGIES_Nbins = 1000
+    E_Min = 0.5
+    E_Max = 15.0
     
     Model_Name = splitpath(Out_path)[end]
     file_name = splitpath(Out_path)[end]
@@ -212,46 +192,25 @@ fits_create_binary_tbl(f, prod(length.(params)), SPECTRA_colsdef, "SPECTRA")
 fits_write_col(f, 1, 1, 1, vec(stack(iter_params)))
 
 for j in eachindex(iter_params)
-    ps = iter_params[j]
+ps = iter_params[j]
     for i in eachindex(ps)
         if length(free_param_symbols[i]) == 1
             setproperty!(model,free_param_symbols[i][1],ps[i])
         else
             n,m = free_param_symbols[i]
-            setproperty!(getproperty(model,n), m, ps[i])
+            try
+                setproperty!(getproperty(model,n), m, ps[i])
+            catch
+                setproperty!(getproperty(getproperty(model,n),:model), m, ps[i])
+            end
         end
         global spec = invokemodel(Energies,model)
         fits_write_col(f, 2, j, 1, spec.parent[:,1]) #CHECK THIS <<<<------------<<<<
     end
 end
-
+getproperty(getproperty(model,n),:model).K=2
 fits_write_key(f,"HDUCLASS", "OGIP", "format conforms to OGIP standard")
 fits_write_key(f,"HDUCLAS1", "XSPEC TABLE MODEL", "")
 fits_write_key(f,"HDUCLAS2", "MODEL SPECTRA", "")
 fits_write_key(f,"HDUVERS", "1.0.0", "format version")
 close(f)
-
-params[1][1]
-begin
-#for j in eachindex(iter_params)
-    j = 3520
-    ps = iter_params[j]
-    for i in eachindex(ps)
-        if length(free_param_symbols[i]) == 1
-            setproperty!(model,free_param_symbols[i][1],ps[i])
-        else
-            n,m = free_param_symbols[i]
-            setproperty!(getproperty(model,n), m, ps[i])
-        end
-        global spec = invokemodel(Energies,model)
-    end
-#end
-    end
-findall(x->x>=0,spec.parent[:,1])
-spec.parent[:,1]
-spec.parent[:,1][1]
-spec.parent[:,2][1]
-(spec.parent[:,1] .+ spec.parent[:,2])./2
-plot(E_high,spec)
-
-

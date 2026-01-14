@@ -43,10 +43,3 @@ function SpectralFitting.invoke!(output, domain, model::Laor)
 end
 
 model = Laor()
-
-energies = collect(logrange(0.1,70,4000))
-@time begin 
-spec = invokemodel(energies,model)
-end
-
-plot(energies[1:end-1],spec)
