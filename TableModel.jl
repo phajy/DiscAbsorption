@@ -1,9 +1,9 @@
-using SpectralFitting, XSPECModels, Relxill, Warmabs, CFITSIO, Plots
-
+using SpectralFitting, XSPECModels, Relxill, Warmabs, CFITSIO, Plots, Base.Threads, Suppressor
+Threads.nthreads() = 32
 include("gradus-lamp-post.jl")
 # as an example I'm initiating a model and setting some parameters. The upper and lower limits set will be the high and low values for which spectra will be created 
 convmodel = LampPost(    
-    h = FitParam(1.5,lower_limit = 1, upper_limit = 20., frozen = false),
+    h = FitParam(1.5,lower_limit = 1.5, upper_limit = 15., frozen = false),
     E = FitParam(1.0,lower_limit = 1., upper_limit = 10., frozen = true),
     R_in = FitParam(-1.,lower_limit= -Inf,frozen = true),
     R_out = FitParam(400., lower_limit=-Inf, frozen = true), 
@@ -11,10 +11,10 @@ convmodel = LampPost(
     a = FitParam(0.998,lower_limit=-0.998,upper_limit=0.998, frozen = true))
 
 specmodel = XillverD5(
-    Γ = FitParam(1.5,lower_limit = 1, upper_limit = 20., frozen = false),
-    A_Fe = FitParam(1.0,lower_limit = 1., upper_limit = 10., frozen = false),
+    Γ = FitParam(2.3,lower_limit = 1, upper_limit = 20., frozen = true),
+    A_Fe = FitParam(1.0,lower_limit = 1., upper_limit = 10., frozen = true),
     logXi = FitParam(3.,lower_limit= 0., upper_limit = 4.,frozen = false),
-    density = FitParam(17., lower_limit=15., upper_limit=19., frozen = false), 
+    density = FitParam(17., lower_limit=15., upper_limit=19., frozen = true), 
     inclination = FitParam(30.,lower_limit=7,upper_limit=85, frozen = true))
 
 
@@ -48,8 +48,8 @@ frozen_param_values = filter(x -> !SpectralFitting.isfree(x), full_model_vals)
     Out_path = "LampPostXillverD5.fits"
     REDSHIFT = "F"
     ESCALE = "F"
-    logged = [0, 0, 0, 0, 0]
-    NumbVals = [10,10,10,10,10]
+    logged = [0, 0]
+    NumbVals = [5, 5]#,10,10,10]
     ENERGIES_Nbins = 1000
     E_Min = 0.5
     E_Max = 15.0
@@ -192,23 +192,24 @@ fits_create_binary_tbl(f, prod(length.(params)), SPECTRA_colsdef, "SPECTRA")
 fits_write_col(f, 1, 1, 1, vec(stack(iter_params)))
 
 for j in eachindex(iter_params)
-ps = iter_params[j]
+    println(j,"/",length(iter_params))
+    ps = iter_params[j]
     for i in eachindex(ps)
         if length(free_param_symbols[i]) == 1
             setproperty!(model,free_param_symbols[i][1],ps[i])
         else
             n,m = free_param_symbols[i]
-            try
-                setproperty!(getproperty(model,n), m, ps[i])
-            catch
-                setproperty!(getproperty(getproperty(model,n),:model), m, ps[i])
-            end
+        try
+            setproperty!(getproperty(model,n), m, ps[i])
+        catch
+            setproperty!(getproperty(getproperty(model,n),:model), m, ps[i])
         end
-        global spec = invokemodel(Energies,model)
-        fits_write_col(f, 2, j, 1, spec.parent[:,1]) #CHECK THIS <<<<------------<<<<
+        end
+            @suppress_err global spec = invokemodel(Energies,model)
+            fits_write_col(f, 2, j, 1, spec.parent[:,1]) #CHECK THIS <<<<------------<<<<
+        end
     end
-end
-getproperty(getproperty(model,n),:model).K=2
+
 fits_write_key(f,"HDUCLASS", "OGIP", "format conforms to OGIP standard")
 fits_write_key(f,"HDUCLAS1", "XSPEC TABLE MODEL", "")
 fits_write_key(f,"HDUCLAS2", "MODEL SPECTRA", "")
