@@ -45,7 +45,7 @@ frozen_param_values = filter(x -> !SpectralFitting.isfree(x), full_model_vals)
 
 #function MakeTable(model,outName)
     SPECTRA_Units = "photons/cm^2/s"
-    Out_path = "LampPostXillverD5.fits"
+    Out_path = "LampPostTest.fits"
     REDSHIFT = "F"
     ESCALE = "F"
     logged = [0, 0, 1, 0, 0]
@@ -192,7 +192,7 @@ fits_create_binary_tbl(f, prod(length.(params)), SPECTRA_colsdef, "SPECTRA")
 fits_write_col(f, 1, 1, 1, vec(stack(iter_params)))
 
 @threads for j in eachindex(iter_params)
-    println(j,"/",length(iter_params))
+    println(j,"/",length(iter_params),"<",Threads.threadid(),">")
     ps = iter_params[j]
     for i in eachindex(ps)
         if length(free_param_symbols[i]) == 1
@@ -205,8 +205,8 @@ fits_write_col(f, 1, 1, 1, vec(stack(iter_params)))
             setproperty!(getproperty(getproperty(model,n),:model), m, ps[i])
         end
         end
-            @suppress_err global spec = invokemodel(Energies,model)
-            fits_write_col(f, 2, j, 1, spec.parent[:,1]) #CHECK THIS <<<<------------<<<<
+            #@suppress_err global spec = invokemodel(Energies,model)
+            fits_write_col(f, 2, j, 1, invokemodel(Energies,model).parent[:,1]) #CHECK THIS <<<<------------<<<<
         end
     end
 
