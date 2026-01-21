@@ -11,10 +11,10 @@ convmodel = LampPost(
     a = FitParam(0.998,lower_limit=-0.998,upper_limit=0.998, frozen = true))
 
 specmodel = XillverD5(
-    Γ = FitParam(2.3,lower_limit = 1, upper_limit = 20., frozen = true),
-    A_Fe = FitParam(1.0,lower_limit = 1., upper_limit = 10., frozen = true),
+    Γ = FitParam(2.3,lower_limit = 1, upper_limit = 3., frozen = false),
+    A_Fe = FitParam(1.0,lower_limit = 1., upper_limit = 100., frozen = false),
     logXi = FitParam(3.,lower_limit= 0., upper_limit = 4.,frozen = false),
-    density = FitParam(17., lower_limit=15., upper_limit=19., frozen = true), 
+    density = FitParam(17., lower_limit=15., upper_limit=19., frozen = false), 
     inclination = FitParam(30.,lower_limit=7,upper_limit=85, frozen = true))
 
 
@@ -45,12 +45,12 @@ frozen_param_values = filter(x -> !SpectralFitting.isfree(x), full_model_vals)
 
 #function MakeTable(model,outName)
     SPECTRA_Units = "photons/cm^2/s"
-    Out_path = "LampPostXillverD5.fits"
+    Out_path = "LampPostTest2.fits"
     REDSHIFT = "F"
     ESCALE = "F"
-    logged = [0, 0]
-    NumbVals = [5, 5]#,10,10,10]
-    ENERGIES_Nbins = 1000
+    logged = [0, 0, 1, 0, 0]
+    NumbVals = [5, 5, 5, 5, 5]
+    ENERGIES_Nbins = 800
     E_Min = 0.5
     E_Max = 15.0
     
@@ -191,7 +191,7 @@ SPECTRA_colsdef = [("PARAMVAL", string(length(free_param_values))*"E", ""),("INT
 fits_create_binary_tbl(f, prod(length.(params)), SPECTRA_colsdef, "SPECTRA")
 fits_write_col(f, 1, 1, 1, vec(stack(iter_params)))
 
-for j in eachindex(iter_params)
+#= @threads for j in eachindex(iter_params)
     println(j,"/",length(iter_params))
     ps = iter_params[j]
     for i in eachindex(ps)
@@ -205,13 +205,43 @@ for j in eachindex(iter_params)
             setproperty!(getproperty(getproperty(model,n),:model), m, ps[i])
         end
         end
-            @suppress_err global spec = invokemodel(Energies,model)
-            fits_write_col(f, 2, j, 1, spec.parent[:,1]) #CHECK THIS <<<<------------<<<<
+            #@suppress_err global spec = invokemodel(Energies,model)
+            @suppress_err fits_write_col(f, 2, j, 1, invokemodel(Energies,model).parent[:,1]) #CHECK THIS <<<<------------<<<<
         end
     end
+ =#
+
+a = eachindex(iter_params)
+chunks = Iterators.partition(a, cld(length(a), Threads.nthreads()))
+
+    tasks = map(chunks) do chunk
+        Threads.@spawn for j in chunk
+            println(j,"/",length(iter_params),"<",Threads.threadid(),">")
+            ps = iter_params[j]
+            for i in eachindex(ps)
+                if length(free_param_symbols[i]) == 1
+                    setproperty!(model,free_param_symbols[i][1],ps[i])
+                else
+                    n,m = free_param_symbols[i]
+                    try
+                        setproperty!(getproperty(model,n), m, ps[i])
+                    catch
+                        setproperty!(getproperty(getproperty(model,n),:model), m, ps[i])
+                    end
+                 end
+            #@suppress_err global spec = invokemodel(Energies,model)
+                @suppress_err fits_write_col(f, 2, j, 1, invokemodel(Energies,model).parent[:,1]) #CHECK THIS <<<<------------<<<<
+            end
+        end
+    end
+
+fetch.(tasks)
 
 fits_write_key(f,"HDUCLASS", "OGIP", "format conforms to OGIP standard")
 fits_write_key(f,"HDUCLAS1", "XSPEC TABLE MODEL", "")
 fits_write_key(f,"HDUCLAS2", "MODEL SPECTRA", "")
 fits_write_key(f,"HDUVERS", "1.0.0", "format version")
 close(f)
+
+
+

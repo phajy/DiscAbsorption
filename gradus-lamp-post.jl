@@ -47,7 +47,7 @@ function SpectralFitting.invoke!(output, domain, model::LampPost)
     data = lineprofile(m, x_obs, d, profile ;bins = g_domain, method = TransferFunctionMethod(), numrₑ = 100)
     output .= data[2][1:end-1]
 end
-
+println("LampPost Loaded")
 #= convmodel = LampPost(    
     h = FitParam(1.5,lower_limit = 1, upper_limit = 20., frozen = false),
     E = FitParam(1.0,lower_limit = 1., upper_limit = 10., frozen = true),
