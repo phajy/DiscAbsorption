@@ -13,7 +13,10 @@ convmodel = LampPost(
 specmodel = XillverD5(
     Γ = FitParam(2.3,lower_limit = 1, upper_limit = 3., frozen = false),
     A_Fe = FitParam(1.0,lower_limit = 1., upper_limit = 100., frozen = false),
+    Γ = FitParam(2.3,lower_limit = 1, upper_limit = 3., frozen = false),
+    A_Fe = FitParam(1.0,lower_limit = 1., upper_limit = 100., frozen = false),
     logXi = FitParam(3.,lower_limit= 0., upper_limit = 4.,frozen = false),
+    density = FitParam(17., lower_limit=15., upper_limit=19., frozen = false), 
     density = FitParam(17., lower_limit=15., upper_limit=19., frozen = false), 
     inclination = FitParam(30.,lower_limit=7,upper_limit=85, frozen = true))
 
@@ -48,6 +51,9 @@ frozen_param_values = filter(x -> !SpectralFitting.isfree(x), full_model_vals)
     Out_path = "LampPostTest2.fits"
     REDSHIFT = "F"
     ESCALE = "F"
+    logged = [0, 0, 1, 0, 0]
+    NumbVals = [5, 5, 5, 5, 5]
+    ENERGIES_Nbins = 800
     logged = [0, 0, 1, 0, 0]
     NumbVals = [5, 5, 5, 5, 5]
     ENERGIES_Nbins = 800

@@ -1,4 +1,4 @@
-itting, XSPECModels, CFITSIO
+using SpectralFitting, XSPECModels, CFITSIO, ProgressMeter, Base.Threads
 
 module TableModels
 using SpectralFitting
@@ -225,7 +225,8 @@ SPECTRA_colsdef = [("PARAMVAL", string(length(TableModel.free_params))*"E", ""),
 fits_create_binary_tbl(f, prod(length.(params)), SPECTRA_colsdef, "SPECTRA")
 fits_write_col(f, 1, 1, 1, vec(stack(iter_params)))
 
-@showprogress for j in eachindex(iter_params)
+#@showprogress 
+@threads for j in eachindex(iter_params)
     ps = iter_params[j]
     for i in eachindex(ps)
         symbol_name = split(TableModel.free_params[i].name,".")
