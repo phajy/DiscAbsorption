@@ -63,21 +63,24 @@ specmodel = XillverD5(
     density = FitParam(17., lower_limit=15., upper_limit=19., frozen = false), 
     inclination = FitParam(30.,lower_limit=7,upper_limit=85, frozen = true))
 
-
-include("TableModelFunctions.jl")
-
-Table = MakeTable(reflecmodel)
-
-OutputTable(reflecmodel,Table)
-reflecmodel.c1.model.K = 1 
-N=30
+N=10
 color = range(colorant"red", stop=colorant"blue", length=N)
+energies = collect(logrange(0.1,100.0,1000))
+hrange = collect(logrange(1.5,50.0,N))
+plot(xlims=(0,1.5))
+for i in eachindex(hrange)
+    s = hrange[i]
+    convmodel.h = s
+    spec = invokemodel(energies,convmodel)
+    S = round(s,digits = ndigits(N))
+    global p = plot!(energies[1:end-1],spec,color=color[i],label = "h = $S")
+end
+display(p)
 
-#specmodel = XS_WarmAbsorber(rlogxi=FitParam(3.2),Feabund=FitParam(8.),column=FitParam(1.5)) * PowerLaw()
+unconvspec = invokemodel(energies,specmodel)
+area = sum(energies[1:end-1].*unconvspec)
+plot(energies[1:end-1],unconvspec./area,yscale=:log10,xscale=:log10,xlims=(0.5,70),xlabel="Energy (keV)",color="black",legend=false)
 
-energies = collect(logrange(0.1,50.,500))
-plot(yscale=:log10,xscale=:log10,xlims=(0.5,12))
-hrange = collect(logrange(1.5,100,N))
 for i in eachindex(hrange)
     s = hrange[i]
     convmodel.h = s
@@ -89,9 +92,4 @@ for i in eachindex(hrange)
     global p = plot!(energies[1:end-1],spec./area,yscale=:log10,xscale=:log10,color=color[i],label = "h = $S")
 end
 display(p)
-#plot!(legend=false,energies[1:end-1],invokemodel(energies,specmodel)./sum(energies[1:end-1].*invokemodel(energies,specmodel)),yscale=:log10,xscale=:log10,color="black",label="unconvolved",xlims=(0.5,12))
-
-plot!(legend=false)
-
-convolution_model = AsConvolution(convmodel)
-reflecmodel = convolution_model(specmodel) =#
+plot!(legend=false) =#

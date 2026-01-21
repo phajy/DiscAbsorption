@@ -1,4 +1,4 @@
-using Interpolations, SpectralFitting
+using Interpolations, SpectralFitting, Plots
 
 begin
     #paths for spectra
@@ -7,7 +7,7 @@ begin
     PATH = joinpath.(DATADIR,STATE)
 
     #just for the lof flux for now
-    i = 3
+    i = 1
     SPEC = joinpath(PATH[i], "joined_spec_grp.pha")
     BKGD = joinpath(PATH[i], "joined_spec.bak")
     RMF = joinpath(PATH[i], "joined_spec.rsp")
@@ -15,9 +15,10 @@ begin
 
     #create data and increase scale to help with normalisation fitting 
     data = OGIPDataset(SPEC,background=BKGD,response=RMF,ancillary=ARF)
-    regroup!(data) ; normalize!(data) ; drop_bad_channels!(data) ; mask_energies!(data, 1.0, 10.0)
+    regroup!(data) ; normalize!(data) ; drop_bad_channels!(data) ; mask_energies!(data, 5.0, 10.4)
 end
 
+plot(data,yscale=:log,legend=false,xlims=(5.0, 10.4), xticks = ([5, 6, 7, 8, 9, 10, 11, 12], ["5", "6", "7", "8", "9", "10"]))
 energy = SpectralFitting.spectrum_energy(data)
 enerror = (data.energy_high-data.energy_low)[findall(x -> x == 1, data.data_mask)]./2
 
