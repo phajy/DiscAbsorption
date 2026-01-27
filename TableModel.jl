@@ -1,8 +1,8 @@
-using SpectralFitting, XSPECModels, Relxill, Warmabs, CFITSIO, Plots, Base.Threads, Suppressor
-Threads.nthreads() = 25
+using SpectralFitting, XSPECModels, Relxill, Warmabs, CFITSIO, Plots, Base.Threads
+Threads.nthreads() = 8
 include("gradus-lamp-post.jl")
 # as an example I'm initiating a model and setting some parameters. The upper and lower limits set will be the high and low values for which spectra will be created 
-convmodel = LampPost(    
+convmodel = LampPost(
     h = FitParam(1.5,lower_limit = 1.5, upper_limit = 15., frozen = false),
     E = FitParam(1.0,lower_limit = 1., upper_limit = 10., frozen = true),
     R_in = FitParam(-1.,lower_limit= -Inf,frozen = true),
@@ -50,7 +50,7 @@ frozen_param_values = filter(x -> !SpectralFitting.isfree(x), full_model_vals)
     ESCALE = "F"
     logged = [0, 1]
     NumbVals = [5, 5]
-    ENERGIES_Nbins = 100
+    ENERGIES_Nbins = 1000
     E_Min = 0.1
     E_Max = 20.0
     
@@ -168,7 +168,7 @@ fits_write_key(f,"HDUCLAS2", "ENERGIES", "")
 fits_write_key(f,"HDUVERS", "1.0.0", "format version")
 
 # Spectra
-#= function addparams(A,B)
+function addparams(A,B)
     out = []
     for a in A
         for b in B
@@ -192,33 +192,50 @@ SPECTRA_colsdef = [("PARAMVAL", string(length(free_param_values))*"E", ""),("INT
 fits_create_binary_tbl(f, prod(length.(params)), SPECTRA_colsdef, "SPECTRA")
 fits_write_col(f, 1, 1, 1, vec(stack(iter_params)))
 
-a = eachindex(iter_params)
-chunks = Iterators.partition(a, cld(length(a), Threads.nthreads()))
+# Process in chunks: compute in parallel, then write serially
+# Chunk size controls memory usage (number of spectra held in memory at once)
+chunk_size = min(100, cld(length(iter_params), Threads.nthreads()))
+chunks = Iterators.partition(eachindex(iter_params), chunk_size)
 
-tasks = map(chunks) do chunk
-    Threads.@spawn for j in chunk
-        #println(j,"/",length(iter_params),"<",Threads.threadid(),">")
+for chunk in chunks
+    chunk_indices = collect(chunk)
+    n_in_chunk = length(chunk_indices)
+    
+    # Pre-allocate buffer for this chunk's results
+    chunk_results = Vector{Vector{Float64}}(undef, n_in_chunk)
+    
+    # Compute spectra in parallel within the chunk
+    Threads.@threads for local_idx in 1:n_in_chunk
+        j = chunk_indices[local_idx]
         ps = iter_params[j]
+        
+        # Create a thread-local copy of the model to avoid race conditions
+        local_model = deepcopy(model)
+        
         for i in eachindex(ps)
             if length(free_param_symbols[i]) == 1
-                setproperty!(model,free_param_symbols[i][1],ps[i])
+                setproperty!(local_model, free_param_symbols[i][1], ps[i])
             else
-                n,m = free_param_symbols[i]
+                n, m = free_param_symbols[i]
                 try
-                    setproperty!(getproperty(model,n), m, ps[i])
+                    setproperty!(getproperty(local_model, n), m, ps[i])
                 catch
-                    setproperty!(getproperty(getproperty(model,n),:model), m, ps[i])
+                    setproperty!(getproperty(getproperty(local_model, n), :model), m, ps[i])
                 end
-             end
-            fits_write_col(f, 2, j, 1, invokemodel(Energies,model).parent[:,1]) #CHECK THIS <<<<------------<<<<
+            end
         end
+        chunk_results[local_idx] = invokemodel(Energies, local_model).parent[:, 1]
+    end
+    
+    # Write results serially (thread-safe)
+    for local_idx in 1:n_in_chunk
+        j = chunk_indices[local_idx]
+        fits_write_col(f, 2, j, 1, chunk_results[local_idx])
     end
 end
-
-fetch.(tasks)
 
 fits_write_key(f,"HDUCLASS", "OGIP", "format conforms to OGIP standard")
 fits_write_key(f,"HDUCLAS1", "XSPEC TABLE MODEL", "")
 fits_write_key(f,"HDUCLAS2", "MODEL SPECTRA", "")
-fits_write_key(f,"HDUVERS", "1.0.0", "format version") =#
+fits_write_key(f,"HDUVERS", "1.0.0", "format version")
 close(f)
