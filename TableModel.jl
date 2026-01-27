@@ -12,9 +12,9 @@ convmodel = LampPost(
 
 specmodel = XillverD5(
     Γ = FitParam(2.3,lower_limit = 1, upper_limit = 3., frozen = true),
-    A_Fe = FitParam(1.0,lower_limit = 1., upper_limit = 100., frozen = true),
-    logXi = FitParam(3.,lower_limit= 0., upper_limit = 4.,frozen = false),
-    density = FitParam(17., lower_limit=15., upper_limit=19., frozen = false), 
+    A_Fe = FitParam(1.0,lower_limit = 1., upper_limit = 100., frozen = false),
+    logXi = FitParam(3.,lower_limit= 0., upper_limit = 4.,frozen = true),
+    density = FitParam(17., lower_limit=15., upper_limit=19., frozen = true), 
     inclination = FitParam(30.,lower_limit=7,upper_limit=85, frozen = true))
 
 
@@ -45,11 +45,11 @@ frozen_param_values = filter(x -> !SpectralFitting.isfree(x), full_model_vals)
 
 #function MakeTable(model,outName)
     SPECTRA_Units = "photons/cm^2/s"
-    Out_path = "LampPostTest4.fits"
+    Out_path = "LampPostTestStilts.fits"
     REDSHIFT = "F"
     ESCALE = "F"
-    logged = [0, 0, 0, 0, 0]
-    NumbVals = [5, 5, 5, 5, 5]
+    logged = [0, 1]
+    NumbVals = [5, 5]
     ENERGIES_Nbins = 100
     E_Min = 0.1
     E_Max = 20.0
@@ -141,9 +141,10 @@ for i in eachindex(params)
     fits_write_col(f, 10, i, 1,params[i])
 end
 
-for i in eachindex(frozen_param_values)
+#= for i in eachindex(frozen_param_values)
     fits_write_key(f,frozen_param_names[i],SpectralFitting.get_value(frozen_param_values[i]),"physical parameter held constant") 
-end
+end =#
+
 fits_write_key(f,"NINTPARM", length(free_param_names), "the number of interpolated parameters")
 fits_write_key(f,"NADDPARM", 0, "the number of additional parameters")
 fits_write_key(f,"HDUCLASS", "OGIP", "format conforms to OGIP standard")
@@ -167,7 +168,7 @@ fits_write_key(f,"HDUCLAS2", "ENERGIES", "")
 fits_write_key(f,"HDUVERS", "1.0.0", "format version")
 
 # Spectra
-function addparams(A,B)
+#= function addparams(A,B)
     out = []
     for a in A
         for b in B
@@ -219,5 +220,5 @@ fetch.(tasks)
 fits_write_key(f,"HDUCLASS", "OGIP", "format conforms to OGIP standard")
 fits_write_key(f,"HDUCLAS1", "XSPEC TABLE MODEL", "")
 fits_write_key(f,"HDUCLAS2", "MODEL SPECTRA", "")
-fits_write_key(f,"HDUVERS", "1.0.0", "format version")
+fits_write_key(f,"HDUVERS", "1.0.0", "format version") =#
 close(f)
