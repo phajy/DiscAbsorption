@@ -30,7 +30,7 @@ end
 function SpectralFitting.invoke!(output, domain, model::LampPost)
     g_domain = copy(domain)
     
-    m = KerrMetric(;a = 0.998)
+    m = KerrMetric(;a = model.a)
     x_obs = SVector(0.0, 1e3, deg2rad(model.θ), 0.0)
 
     if model.R_in < 0 
