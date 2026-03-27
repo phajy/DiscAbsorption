@@ -1,6 +1,7 @@
 using SpectralFitting, XSPECModels, Relxill, Plots
 
 include("gradus-lamp-post.jl")
+
 function FreezeAll(model)
     for p in SpectralFitting.parameter_tuple(model)
         p.frozen = true
@@ -8,28 +9,36 @@ function FreezeAll(model)
 end
 
 function calc_residuals(result)
-    # select which result we want (only have one, but for generalisation to multi-model fits)
-    r = result[1]
+    r = result
     y = calculate_objective!(r, r.u)
     obj, var = get_objective(r), get_objective_variance(r)
     @. (obj - y) / sqrt(var)
 end
 
-function plot_res(data,result)
-    domain = SpectralFitting.plotting_domain(data)
-    dp = plot(data, yscale=:log10, xscale=:log10)
-    plot!(dp, result, label = "χ^2=$(round(sum(result.stats)))")
-    rp = hline([0], linestyle = :dash, legend = false, color=:black)
-    plot!(rp, domain, calc_residuals(result),seriestype=:stepmid)
-    plot(dp, rp, layout = (2,1), link=:x,xscale=:log10,xlims=(3,79),xticks = ([3,4,5,6,7,8,9,10,20,30,40,50,60,70,80], ["3", "4", "5", "6", "7", "8","9","10","20","30","40","50","60","70","80"]))
+function plot_res(dataA,dataB,result)
+    domainA = SpectralFitting.plotting_domain(dataA)
+    domainB = SpectralFitting.plotting_domain(dataB)
+    dataplot = plot(dataA, yscale=:log10, xscale=:log10, label="$(dataA.user_data.observation_id)"*"FPMA", color=:black, msc=:black, alpha=0.2, xlabel=false)
+    plot!(dataplot, dataB, label="$(dataA.user_data.observation_id)"*"FPMB", color=:red, msc=:red, alpha=0.2)
+    plot!(dataplot, result[1], color=:black)
+    plot!(dataplot, result[2], color=:red)
+    resplot = hline([0], linestyle = :dash, color=:blue, xlabel="Energy (keV)", ylabel="Residuals", label=false)
+    plot!(resplot, domainA, calc_residuals(result[1]),seriestype=:stepmid, color=:black, alpha=0.7,label = "FPMA χ^2=$(round(sum(result[1].stats)))",)
+    plot!(resplot, domainB, calc_residuals(result[2]),seriestype=:stepmid, color=:red, alpha=0.7,label = "FPMB χ^2=$(round(sum(result[2].stats)))",)
+    plot(dataplot, resplot, layout = (2,1), link=:x, xscale=:log10, xlims=(3,79), xticks=([3,4,5,6,7,8,9,10,20,30,40,50,60,70,80], ["3", "4", "5", "6", "7", "8","9","10","20","30","40","50","60","70","80"]))
 end
 
-function ApplyResult(result,model)
-        all_params = SpectralFitting.update_free_parameters!(result.config.parameter_cache, result.u)
-    for (p, r) in zip(SpectralFitting.parameter_vector(model), all_params)
+function ApplyResult(result,modelA,modelB)
+        all_paramsA = SpectralFitting.update_free_parameters!(result.config.parameter_cache, result.u)[1:16]
+        all_paramsB = SpectralFitting.update_free_parameters!(result.config.parameter_cache, result.u)[17:end]
+
+    for (p, r) in zip(SpectralFitting.parameter_vector(modelA), all_paramsA)
         set_value!(p, r)
     end
-    model
+
+    for (p, r) in zip(SpectralFitting.parameter_vector(modelB), all_paramsB)
+        set_value!(p, r)
+    end
     details(prob)
 end
 
@@ -43,6 +52,7 @@ convmodel = LampPost(
 )
     
 specmodel = XillverD5(
+    K = FitParam(0.0,frozen = true),
     Γ = FitParam(2.3,lower_limit = 1, upper_limit = 2., frozen = false),
     A_Fe = FitParam(1.0,lower_limit = 0.1, upper_limit = 100., frozen = false),
     logXi = FitParam(3.,lower_limit= 3., upper_limit = 4.,frozen = false),
@@ -55,43 +65,63 @@ PL = PowerLaw(
 )
 
 Abs = PhotoelectricAbsorption(
-    ηH = FitParam(0.86,lower_limit=0.0,upper_limit=3.0, frozen = true)
+    ηH = FitParam(0.86,lower_limit=0.0,upper_limit=3.0, frozen = false)
 )
 convolution_model = AsConvolution(convmodel)
-model = Abs*(PL+convolution_model(specmodel))
+modelA = Constant(value = FitParam(1.0, frozen=true))*Abs*(PL+convolution_model(specmodel))
+modelB = Constant(value = FitParam(1.0, frozen=false))*Abs*(PL+convolution_model(specmodel))
 
 PATH = "/Users/er19801/DiscAbsorption/data/NuSTAR/"
 
 SPECA = joinpath(PATH, "nu80402315002A01_sr_grp.pha")
-#SPECB = joinpath(PATH, "nu80402315002B01_sr_grp.pha")
+SPECB = joinpath(PATH, "nu80402315002B01_sr_grp.pha")
 
 dataA = OGIPDataset(SPECA)
-#dataB = OGIPDataset(SPECB)
+dataB = OGIPDataset(SPECB)
 
 regroup!(dataA) ; normalize!(dataA) ; drop_bad_channels!(dataA) ; mask_energies!(dataA, 3.0, 79.0)
+regroup!(dataB) ; normalize!(dataB) ; drop_bad_channels!(dataB) ; mask_energies!(dataB, 3.0, 79.0)
 
-prob = FittingProblem(model => dataA)
-bind!(prob, (1, :a1, :a) => (1, :a2, :Γ))
-bind!(prob, (1, :c1, :θ) => (1, :a2, :inclination))
+prob = FittingProblem(modelA => dataA, modelB => dataB)
 details(prob)
+begin
+    bind!(prob, (1, :m2, :ηH) => (2, :m2, :ηH))
+    bind!(prob, (1, :a1, :K) => (2, :a1, :K))
+    bind!(prob, (1, :a1, :a) => (1, :a2, :Γ) => (2, :a1, :a) => (2, :a2, :Γ))
+    #bind!(prob, (1, :c1, :K) => (2, :c1, :K))
+    bind!(prob, (1, :c1, :h) => (2, :c1, :h))
+    bind!(prob, (1, :c1, :θ) => (1, :a2, :inclination) => (2, :c1, :θ) => (2, :a2, :inclination))
+    bind!(prob, (1, :c1, :a) => (2, :c1, :a))
+    bind!(prob, (1, :a2, :K) => (2, :a2, :K))
+    bind!(prob, (1, :a2, :A_Fe) => (2, :a2, :A_Fe))
+    bind!(prob, (1, :a2, :logXi) => (2, :a2, :logXi))
+    bind!(prob, (1, :a2, :density) => (2, :a2, :density))
+    details(prob)
+end
 
-model.a2.K = 0
-model.a2.K.frozen = true
-result = fit(prob, LevenbergMarquadt(), autodiff = :finite)
+result = fit(prob, LevenbergMarquadt(), autodiff = :finite, verbose = true)
+##
+plot_res(dataA,dataB,result)
 
-plot_res(dataA,result)
+ApplyResult(result,modelA,modelB)
 
 result_PL_fit = deepcopy(result)
 
-ApplyResult(result,model)
-
-model.a2.K = 1
-model.a2.K.frozen = false
-model.a1.K.frozen = true
-model.a1.a.frozen = true
+begin
+modelA.a2.K = 1 
+modelA.a2.K.frozen = false 
+modelB.a2.K = 1 
+modelB.a2.K.frozen = false 
+bind!(prob, (1, :a2, :K) => (2, :a2, :K))
 details(prob)
-result = fit(prob, LevenbergMarquadt(), autodiff = :finite)
+end
 
-ApplyResult(result,model)
+result = fit(prob, LevenbergMarquadt(), autodiff = :finite, verbose = true)
+
+result_LP_fit = deepcopy(result)
+
+plot_res(dataA,dataB,result)
+
+ApplyResult(result,modelA,modelB)
 
 
