@@ -1,4 +1,4 @@
-using Gradus, Plots, SpectralFitting, Warmabs, Colors, XSPECModels, CFITSIO, Relxill
+using Gradus, Plots, SpectralFitting
 
 struct LampPost{T} <: AbstractSpectralModel{T,Additive}
     "Normalisation"
@@ -49,3 +49,41 @@ function SpectralFitting.invoke!(output, domain, model::LampPost)
 end
 
 println("LampPost Loaded")
+
+struct Const{T} <: AbstractSpectralModel{T,Multiplicative}
+    "Constant"
+    C::T
+end
+
+function Const(;
+    C = FitParam(1.0,frozen = true))
+end
+
+function SpectralFitting.invoke!(output, domain, model::Const)
+    output .*= model.C
+end
+
+println("Const Loaded")
+
+struct CutoffPL{T} <: AbstractSpectralModel{T,Additive}
+    "Normalisation"
+    K::T
+    "Photon Index"
+    Γ::T
+    "Energy Cutoff"
+    β::T
+end
+
+function CutoffPL(;
+    K = FitParam(1.0),
+    Γ = FitParam(2.0),
+    β = FitParam(100.0)
+)
+end
+
+function invoke!(output, domain, model::CutoffPL)
+    output .= (domain^-Γ)*exp(-domain/β)
+end
+
+
+println("CutoffPl Loaded")

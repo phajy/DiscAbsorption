@@ -54,7 +54,7 @@ convmodel = LampPost(
 specmodel = XillverD5(
     K = FitParam(0.0,frozen = true),
     Γ = FitParam(2.3,lower_limit = 1, upper_limit = 2., frozen = false),
-    A_Fe = FitParam(1.0,lower_limit = 0.1, upper_limit = 100., frozen = false),
+    A_Fe = FitParam(1.0,lower_limit = 0.1, upper_limit = 100., frozen = true),
     logXi = FitParam(3.,lower_limit= 3., upper_limit = 4.,frozen = false),
     density = FitParam(17., lower_limit=15., upper_limit=19., frozen = false), 
     inclination = FitParam(30.,lower_limit=27.,upper_limit=33., frozen = false)
@@ -65,7 +65,7 @@ PL = PowerLaw(
 )
 
 Abs = PhotoelectricAbsorption(
-    ηH = FitParam(0.86,lower_limit=0.0,upper_limit=3.0, frozen = false)
+    ηH = FitParam(0.0,lower_limit=0.0,upper_limit=3.0, frozen = true)
 )
 convolution_model = AsConvolution(convmodel)
 modelA = Constant(value = FitParam(1.0, frozen=true))*Abs*(PL+convolution_model(specmodel))
@@ -100,10 +100,10 @@ begin
 end
 
 result = fit(prob, LevenbergMarquadt(), autodiff = :finite, verbose = true)
-##
-plot_res(dataA,dataB,result)
 
 ApplyResult(result,modelA,modelB)
+plot_res(dataA,dataB,result)
+
 
 result_PL_fit = deepcopy(result)
 
@@ -123,5 +123,9 @@ result_LP_fit = deepcopy(result)
 plot_res(dataA,dataB,result)
 
 ApplyResult(result,modelA,modelB)
-
-
+details(prob)
+modelA.m2.ηH = 0
+modelA.m2.ηH.frozen = false
+modelA.a2.A_Fe = 1
+modelA.a2.A_Fe.frozen = true
+modelA.c1.model.θ = 27
