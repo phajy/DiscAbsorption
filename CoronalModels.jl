@@ -41,9 +41,17 @@ function ApplyResult(result,modelA,modelB)
     details(prob)
 end
 
-function AddMask(data,range)
+function ignore(data,lowE,highE)
+    lowPI = Int(round((lowE-1.6)/0.04))
+    highPI = Int(round((highE-1.6)/0.04))
+end
+function notice(data,lowE,highE)
     0.4*X+1.6
 end
+function CurrentEnergies()
+    
+end
+
 
 convmodel = LampPost(
     h = FitParam(5.,lower_limit = 5., upper_limit = 100., frozen = false),
@@ -63,8 +71,8 @@ specmodel = XillverD5(
     inclination = FitParam(30.,lower_limit=27.,upper_limit=33., frozen = false)
 )
         
-PL = PowerLaw(
-    a = FitParam(2.0,lower_limit=1.0,upper_limit=3.0, frozen = false)
+PL = CutoffPL(
+    Γ = FitParam(2.0,lower_limit=1.0,upper_limit=3.0, frozen = false)
 )
 
 Abs = PhotoelectricAbsorption(
@@ -90,7 +98,8 @@ details(prob)
 begin
     bind!(prob, (1, :m2, :ηH) => (2, :m2, :ηH))
     bind!(prob, (1, :a1, :K) => (2, :a1, :K))
-    bind!(prob, (1, :a1, :a) => (1, :a2, :Γ) => (2, :a1, :a) => (2, :a2, :Γ))
+    bind!(prob, (1, :a1, :Γ) => (1, :a2, :Γ) => (2, :a1, :Γ) => (2, :a2, :Γ))
+    bind!(prob, (1, :a1, :β) => (2, :a1, :β))
     #bind!(prob, (1, :c1, :K) => (2, :c1, :K))
     bind!(prob, (1, :c1, :h) => (2, :c1, :h))
     bind!(prob, (1, :c1, :θ) => (1, :a2, :inclination) => (2, :c1, :θ) => (2, :a2, :inclination))
@@ -101,9 +110,13 @@ begin
     bind!(prob, (1, :a2, :density) => (2, :a2, :density))
     FreezeAll(modelA)
     modelA.a1.K.frozen = false
-    modelA.a1.a.frozen = false
+    modelA.a1.Γ.frozen = false
+    modelA.a1.β.frozen = false
     details(prob)
 end
+
+##
+
 result = fit(prob, LevenbergMarquadt(), autodiff = :finite, verbose = true)
 
 ApplyResult(result,modelA,modelB)
