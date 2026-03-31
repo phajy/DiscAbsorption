@@ -1,9 +1,8 @@
 using SpectralFitting, XSPECModels, Relxill, Plots
-
 include("gradus-lamp-post.jl")
 
 function FreezeAll(model)
-    for p in SpectralFitting.parameter_tuple(model)
+    for p in SpectralFitting.parameter_vector(model)
         p.frozen = true
     end
 end
@@ -23,8 +22,8 @@ function plot_res(dataA,dataB,result)
     plot!(dataplot, result[1], color=:black)
     plot!(dataplot, result[2], color=:red)
     resplot = hline([0], linestyle = :dash, color=:blue, xlabel="Energy (keV)", ylabel="Residuals", label=false)
-    plot!(resplot, domainA, calc_residuals(result[1]),seriestype=:stepmid, color=:black, alpha=0.7,label = "FPMA χ^2=$(round(sum(result[1].stats)))",)
-    plot!(resplot, domainB, calc_residuals(result[2]),seriestype=:stepmid, color=:red, alpha=0.7,label = "FPMB χ^2=$(round(sum(result[2].stats)))",)
+    plot!(resplot, domainA, calc_residuals(result[1]),seriestype=:stepmid, color=:black, alpha=0.7,label = "FPMA",)
+    plot!(resplot, domainB, calc_residuals(result[2]),seriestype=:stepmid, color=:red, alpha=0.7,label = "FPMB",)
     plot(dataplot, resplot, layout = (2,1), link=:x, xscale=:log10, xlims=(3,79), xticks=([3,4,5,6,7,8,9,10,20,30,40,50,60,70,80], ["3", "4", "5", "6", "7", "8","9","10","20","30","40","50","60","70","80"]))
 end
 
@@ -40,6 +39,10 @@ function ApplyResult(result,modelA,modelB)
         set_value!(p, r)
     end
     details(prob)
+end
+
+function AddMask(data,range)
+    0.4*X+1.6
 end
 
 convmodel = LampPost(
@@ -73,8 +76,8 @@ modelB = Constant(value = FitParam(1.0, frozen=false))*Abs*(PL+convolution_model
 
 PATH = "/Users/er19801/DiscAbsorption/data/NuSTAR/"
 
-SPECA = joinpath(PATH, "nu80402315002A01_sr_grp.pha")
-SPECB = joinpath(PATH, "nu80402315002B01_sr_grp.pha")
+SPECA = joinpath(PATH, "nu80402315002A01_sr_grp_1000.pha")
+SPECB = joinpath(PATH, "nu80402315002B01_sr_grp_1000.pha")
 
 dataA = OGIPDataset(SPECA)
 dataB = OGIPDataset(SPECB)
@@ -96,27 +99,37 @@ begin
     bind!(prob, (1, :a2, :A_Fe) => (2, :a2, :A_Fe))
     bind!(prob, (1, :a2, :logXi) => (2, :a2, :logXi))
     bind!(prob, (1, :a2, :density) => (2, :a2, :density))
+    FreezeAll(modelA)
+    modelA.a1.K.frozen = false
+    modelA.a1.a.frozen = false
     details(prob)
 end
-
 result = fit(prob, LevenbergMarquadt(), autodiff = :finite, verbose = true)
 
 ApplyResult(result,modelA,modelB)
 plot_res(dataA,dataB,result)
-
+##
 
 result_PL_fit = deepcopy(result)
 
-begin
-modelA.a2.K = 1 
-modelA.a2.K.frozen = false 
-modelB.a2.K = 1 
-modelB.a2.K.frozen = false 
-bind!(prob, (1, :a2, :K) => (2, :a2, :K))
+#begin
 details(prob)
-end
-
+modelA.c1.h.frozen = false
+modelA.c1.θ.frozen = false
+modelA.c1.a.frozen = false
+modelA.a2.K.frozen = false 
+modelA.a2.K = 1 
+modelB.a2.K.frozen = false 
+modelB.a2.K = 1 
+bind!(prob, (1, :a2, :K) => (2, :a2, :K))
+modelA.a2.A_Fe.frozen = false
+modelA.a2.logXi.frozen = false
+modelA.a2.density.frozen = false
+details(prob)
+#end
+@time begin
 result = fit(prob, LevenbergMarquadt(), autodiff = :finite, verbose = true)
+end
 
 result_LP_fit = deepcopy(result)
 
@@ -125,7 +138,7 @@ plot_res(dataA,dataB,result)
 ApplyResult(result,modelA,modelB)
 details(prob)
 modelA.m2.ηH = 0
-modelA.m2.ηH.frozen = false
+modelA.m2.ηH.frozen = true
 modelA.a2.A_Fe = 1
 modelA.a2.A_Fe.frozen = true
 modelA.c1.model.θ = 27

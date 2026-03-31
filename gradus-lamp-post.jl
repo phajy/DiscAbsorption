@@ -44,26 +44,12 @@ function SpectralFitting.invoke!(output, domain, model::LampPost)
     mode = LampPostModel(h = model.h)
     profile = emissivity_profile(m, d, mode)
 
-    data = lineprofile(m, x_obs, d, profile ;bins = g_domain, method = TransferFunctionMethod(), numrₑ = 100)
+    data = lineprofile(m, x_obs, d, profile ;bins = g_domain, method = TransferFunctionMethod(), numrₑ = 50)
     output .= data[2][1:end-1]
 end
 
 println("LampPost Loaded")
 
-struct Const{T} <: AbstractSpectralModel{T,Multiplicative}
-    "Constant"
-    C::T
-end
-
-function Const(;
-    C = FitParam(1.0,frozen = true))
-end
-
-function SpectralFitting.invoke!(output, domain, model::Const)
-    output .*= model.C
-end
-
-println("Const Loaded")
 
 struct CutoffPL{T} <: AbstractSpectralModel{T,Additive}
     "Normalisation"
@@ -77,13 +63,42 @@ end
 function CutoffPL(;
     K = FitParam(1.0),
     Γ = FitParam(2.0),
-    β = FitParam(100.0)
-)
+    β = FitParam(100.0))
+    CutoffPL{typeof(K)}(K,Γ,β)
 end
 
 function invoke!(output, domain, model::CutoffPL)
-    output .= (domain^-Γ)*exp(-domain/β)
+    let Γ = model.Γ, β = model.β
+        integration_kernel!(output, domain) do E, δE
+            δE*E^(-1*Γ)*exp(-1*(E / β))
+        end
+    end
 end
 
-
 println("CutoffPl Loaded")
+
+energies=collect(logrange(3, 79, 100))
+model = CutoffPL()
+output=invokemodel(energies,model)
+plot(energies, output, xscale=:log10, yscale=:log10)
+
+#= struct Cutoff{T} <: AbstractSpectralModel{T,Multiplicative}
+    "Energy Cutoff"
+    β::T
+end
+
+function Cutoff(;
+    β = FitParam(100.0))
+    Cutoff(;β)
+end
+
+function invoke!(output, domain, model::Cutoff)
+    let β = model.β
+        E = domain[1:(end-1)]
+        output .= exp.(E./β)
+    end
+end
+println("Cutoff Loaded")
+##
+
+ =#
