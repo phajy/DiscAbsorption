@@ -67,9 +67,9 @@ function CutoffPL(;
     CutoffPL{typeof(K)}(K,Γ,β)
 end
 
-function invoke!(output, domain, model::CutoffPL)
+function SpectralFitting.invoke!(output, domain, model::CutoffPL)
     let Γ = model.Γ, β = model.β
-        integration_kernel!(output, domain) do E, δE
+        SpectralFitting.integration_kernel!(output, domain) do E, δE
             δE*E^(-1*Γ)*exp(-1*(E / β))
         end
     end
@@ -80,7 +80,7 @@ println("CutoffPl Loaded")
 energies=collect(logrange(3, 79, 100))
 model = CutoffPL()
 output=invokemodel(energies,model)
-plot(energies, output, xscale=:log10, yscale=:log10)
+plot(energies[1:length(energies)-1], output, xscale=:log10, yscale=:log10)
 
 #= struct Cutoff{T} <: AbstractSpectralModel{T,Multiplicative}
     "Energy Cutoff"
