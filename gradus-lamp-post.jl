@@ -76,3 +76,94 @@ function SpectralFitting.invoke!(output, domain, model::CutoffPL)
 end
 
 println("CutoffPl Loaded")
+
+struct FullModel{T} <: AbstractSpectralModel{T,Additive}
+    "Normalisation"
+    K::T
+    "Corona Height"
+    h::T
+    "Inner Radius"
+    R_in::T
+    "Outer Radius"
+    R_out::T
+    "Inclination"
+    θ::T
+    "Spin"
+    a::T
+    "Photon Index"
+    Γ::T
+    "Iron Abundance"
+    A_Fe::T
+    "Ionisation Parameter"
+    logXi::T
+    "density"
+    density::T
+end
+
+function FullModel(;K = FitParam(1.0),
+    h = FitParam(5.,lower_limit = 1.5, upper_limit = 100., frozen = false),
+    R_in = FitParam(0.,lower_limit= -Inf,frozen = true),
+    R_out = FitParam(Inf, lower_limit=-Inf, frozen = true), 
+    θ = FitParam(30.,lower_limit=7,upper_limit=85, frozen = false),
+    a = FitParam(0.7,lower_limit=0.0,upper_limit=0.998, frozen = false),
+    Γ = FitParam(2.3,lower_limit = 1, upper_limit = 3., frozen = false),
+    A_Fe = FitParam(1.0,lower_limit = 0.1, upper_limit = 100., frozen = true),
+    logXi = FitParam(3.0,lower_limit= 2., upper_limit = 4.,frozen = false),
+    density = FitParam(17., lower_limit=15., upper_limit=19., frozen = false))
+    FullModel(K,h,R_in,R_out,θ,a,Γ,A_Fe,logXi,density)
+end
+
+function SpectralFitting.invoke!(output, domain, model::FullModel)
+    convmodel = LampPost(
+    K = FitParam(1.0),
+    h = FitParam(model.h),
+    E = FitParam(1.0,lower_limit = 1., upper_limit = 10., frozen = true),
+    R_in = FitParam(model.R_in),
+    R_out = FitParam(model.R_out), 
+    θ = FitParam(model.θ),
+    a = FitParam(model.a))
+    
+    specmodel = XillverD5(
+    K = FitParam(model.K),
+    Γ = FitParam(model.Γ),
+    A_Fe = FitParam(model.A_Fe),
+    logXi = FitParam(model.logXi),
+    density = FitParam(model.density), 
+    inclination = FitParam(model.θ))
+        
+    convolution_model = AsConvolution(convmodel)
+    Fmodel = convolution_model(specmodel)
+    output .= invokemodel(domain,Fmodel)
+end
+
+println("FullModel Loaded")
+
+#=energies = collect(logrange(2.5,90,900))
+PL = CutoffPL(
+    Γ = FitParam(1.63,lower_limit=1.0,upper_limit=3.0, frozen = false),
+    β = FitParam(164.0,lower_limit=10.0,upper_limit=600.0, frozen = false),
+    K = FitParam(8.3,frozen = true),
+)
+
+SpecModel = FullModel(
+    h = FitParam(26.,lower_limit = 1.5, upper_limit = 100., frozen = false),
+    R_in = FitParam(0.,lower_limit= -Inf,frozen = true),
+    R_out = FitParam(Inf, lower_limit=-Inf, frozen = true), 
+    θ = FitParam(35.,lower_limit=7,upper_limit=85, frozen = false),
+    a = FitParam(0.56,lower_limit=0.0,upper_limit=0.998, frozen = false),
+    Γ = FitParam(1.65,lower_limit = 1, upper_limit = 3., frozen = false),
+    A_Fe = FitParam(1.0,lower_limit = 0.1, upper_limit = 100., frozen = true),
+    logXi = FitParam(3.04,lower_limit= 2., upper_limit = 4.,frozen = false),
+    density = FitParam(16.5, lower_limit=15., upper_limit=19., frozen = false)
+    )
+
+model = PL+SpecModel
+@time begin
+spec = invokemodel(energies,model)
+pl = invokemodel(energies,PL)
+conv = invokemodel(energies,SpecModel)
+plot(energies[1:end-1],spec,xscale=:log10,yscale=:log10,xlim=(3,79))
+plot!(energies[1:end-1],pl)
+plot!(energies[1:end-1],conv)
+end 
+(prod([10, 10, 10, 10, 10, 10])*1.1742101)/(60^2)=#
