@@ -3,13 +3,14 @@ include("gradus-lamp-post.jl")
 # as an example I'm initiating a model and setting some parameters. The upper and lower limits set will be the high and low values for which spectra will be created 
 Threads.nthreads() = 32
 
-model = FullModel(
-    h = FitParam(5.,lower_limit = 2.5, upper_limit = 100., frozen = false),
+model = FullModelRing(
+    r = FitParam(5.,lower_limit = 1.5, upper_limit = 5., frozen = false),
+    h = FitParam(5.,lower_limit = 1.5, upper_limit = 50., frozen = false),
     R_in = FitParam(0.,lower_limit= 0. ,upper_limit=0, frozen = true),
     R_out = FitParam(400., lower_limit=400. ,upper_limit=600., frozen = true), 
     θ = FitParam(35.,lower_limit=7.,upper_limit=85., frozen = false),
     a = FitParam(0.75,lower_limit=0.1,upper_limit=0.998, frozen = false),
-    Γ = FitParam(2.0,lower_limit = 1., upper_limit = 3., frozen = false),
+    Γ = FitParam(2.0,lower_limit = 1., upper_limit = 4., frozen = false),
     A_Fe = FitParam(1.0,lower_limit = 0.1, upper_limit = 100., frozen = true),
     logXi = FitParam(3.0,lower_limit= 2.0, upper_limit = 4.0,frozen = false),
     density = FitParam(17.0, lower_limit=15., upper_limit=19., frozen = false)
@@ -39,11 +40,11 @@ frozen_param_values = filter(x -> !SpectralFitting.isfree(x), full_model_vals)
 
 #function MakeTable(model,outName)
     SPECTRA_Units = "photons/cm^2/s"
-    Out_path = "LampPostFinalBigger.fits"
+    Out_path = "RingCoronaFinalBigger.fits"
     REDSHIFT = "F"
     ESCALE = "F"
-    logged = [1, 0, 0, 0, 0, 0]
-    NumbVals = [10, 10, 10, 10, 10, 10]
+    logged = [1, 1, 0, 0, 0, 0, 0]
+    NumbVals = [5, 5, 5, 5, 5, 5, 5]
     ENERGIES_Nbins = 900
     E_Min = 2.5
     E_Max = 90.0
@@ -188,7 +189,7 @@ fits_write_col(f, 1, 1, 1, vec(stack(iter_params)))
 
 # Process in chunks: compute in parallel, then write serially
 # Chunk size controls memory usage (number of spectra held in memory at once)
-chunk_size = min(100, cld(length(iter_params), Threads.nthreads()))
+chunk_size = min(1, cld(length(iter_params), Threads.nthreads()))
 chunks = Iterators.partition(eachindex(iter_params), chunk_size)
 
 for chunk in chunks
@@ -201,6 +202,7 @@ for chunk in chunks
     # Compute spectra in parallel within the chunk
     Threads.@threads for local_idx in 1:n_in_chunk
         j = chunk_indices[local_idx]
+
         ps = iter_params[j]
         
         # Create a thread-local copy of the model to avoid race conditions
@@ -218,12 +220,15 @@ for chunk in chunks
                 end
             end
         end
+        println("Starting spectra $j")        
         chunk_results[local_idx] = invokemodel(Energies, local_model).parent[:, 1]
+        println("Finished spectra $j")            
     end
     
     # Write results serially (thread-safe)
     for local_idx in 1:n_in_chunk
         j = chunk_indices[local_idx]
+        println("Writing $j")
         fits_write_col(f, 2, j, 1, chunk_results[local_idx])
     end
 end
