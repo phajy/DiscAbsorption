@@ -44,7 +44,7 @@ function SpectralFitting.invoke!(output, domain, model::LampPost)
     mode = LampPostModel(h = model.h)
     profile = emissivity_profile(m, d, mode)
 
-    data = lineprofile(m, x_obs, d, profile ;bins = g_domain, method = TransferFunctionMethod(), numrₑ = 10)
+    data = lineprofile(m, x_obs, d, profile ;bins = g_domain, method = TransferFunctionMethod(), numrₑ = 30)
     output .= data[2][1:end-1]
 end
 
