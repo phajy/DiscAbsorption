@@ -1,0 +1,8 @@
+# --- Local / large data (untracked only; paths already tracked stay tracked) ---
+/data/
+
+# Fortran scratch units often created next to drivers
+fort.*
+
+# macOS
+.DS_Store
