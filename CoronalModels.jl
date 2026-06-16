@@ -41,20 +41,50 @@ function ApplyResult(result,modelA,modelB)
     details(prob)
 end
 
-function ignore(data,lowE,highE)
-    lowPI = Int(round((lowE-1.6)/0.04))
-    highPI = Int(round((highE-1.6)/0.04))
-end
-function notice(data,lowE,highE)
-    0.4*X+1.6
-end
-function CurrentEnergies()
-    
+function notice!(data,lowE,highE)
+    if lowE < 1.6 
+        @warn "Minumum energy provided is lower than domain. Setting minumum to 1.6keV"
+        lowE = 1.6
+    end
+    if highE > 165.4
+        @warn "Maximum energy provided is higher than domain. Setting maximum to 165.4keV"
+        highE = 165.4
+    end
+    mask = getproperty(data, :data_mask)
+    lowPI = Int((lowE-1.6)/0.04)+1
+    highPI = Int((highE-1.6)/0.04)+1
+    for i in eachindex(mask)
+        if lowPI <= i <= highPI
+            mask[i] = 1
+        end
+    end
+    setproperty!(data, :data_mask, mask)
+    println("noticed channels $(lowPI-1)-$(highPI-1)")
 end
 
+function ignore!(data,lowE,highE)
+    if lowE < 1.6 
+        @warn "Minumum energy provided is lower than domain. Setting minumum to 1.6keV"
+        lowE = 1.6
+    end
+    if highE > 165.4
+        @warn "Maximum energy provided is higher than domain. Setting maximum to 165.4keV"
+        highE = 165.4
+    end
+    mask = getproperty(data, :data_mask)
+    lowPI = Int((lowE-1.6)/0.04)+1
+    highPI = Int((highE-1.6)/0.04)+1
+    for i in eachindex(mask)
+        if lowPI <= i <= highPI
+            mask[i] = 0
+        end
+    end
+    setproperty!(data, :data_mask, mask)
+    println("ignored channels $(lowPI-1)-$(highPI-1)")
+end
 
 convmodel = LampPost(
-    h = FitParam(5.,lower_limit = 5., upper_limit = 100., frozen = false),
+    h = FitParam(5.,lower_limit = 1.5, upper_limit = 100., frozen = false),
     E = FitParam(1.0,lower_limit = 1., upper_limit = 10., frozen = true),
     R_in = FitParam(0.,lower_limit= -Inf,frozen = true),
     R_out = FitParam(Inf, lower_limit=-Inf, frozen = true), 
@@ -72,7 +102,8 @@ specmodel = XillverD5(
 )
         
 PL = CutoffPL(
-    Γ = FitParam(2.0,lower_limit=1.0,upper_limit=3.0, frozen = false)
+    Γ = FitParam(2.0,lower_limit=1.0,upper_limit=3.0, frozen = false),
+    β = FitParam(100.0,lower_limit=10.0,upper_limit=600.0, frozen = false)
 )
 
 Abs = PhotoelectricAbsorption(
@@ -82,20 +113,20 @@ convolution_model = AsConvolution(convmodel)
 modelA = Constant(value = FitParam(1.0, frozen=true))*Abs*(PL+convolution_model(specmodel))
 modelB = Constant(value = FitParam(1.0, frozen=false))*Abs*(PL+convolution_model(specmodel))
 
-PATH = "/Users/er19801/DiscAbsorption/data/NuSTAR/"
+#PATH = "/Users/er19801/DiscAbsorption/data/NuSTAR/"
+PATH = "/data/typhon2/DariusM/NuStar_Data/MAXI_J1348-630/80402315002/products"
 
-SPECA = joinpath(PATH, "nu80402315002A01_sr_grp_1000.pha")
-SPECB = joinpath(PATH, "nu80402315002B01_sr_grp_1000.pha")
+SPECA = joinpath(PATH, "nu80402315002A01_sr_1000.pha")
+SPECB = joinpath(PATH, "nu80402315002B01_sr_1000.pha")
 
 dataA = OGIPDataset(SPECA)
 dataB = OGIPDataset(SPECB)
 
-regroup!(dataA) ; normalize!(dataA) ; drop_bad_channels!(dataA) ; mask_energies!(dataA, 3.0, 79.0)
-regroup!(dataB) ; normalize!(dataB) ; drop_bad_channels!(dataB) ; mask_energies!(dataB, 3.0, 79.0)
+regroup!(dataA) ; normalize!(dataA) ; drop_bad_channels!(dataA); mask_energies!(dataA,3.0,79.0) 
+regroup!(dataB) ; normalize!(dataB) ; drop_bad_channels!(dataB); mask_energies!(dataB,3.0,79.0) 
 
-prob = FittingProblem(modelA => dataA, modelB => dataB)
-details(prob)
 begin
+prob = FittingProblem(modelA => dataA, modelB => dataB)
     bind!(prob, (1, :m2, :ηH) => (2, :m2, :ηH))
     bind!(prob, (1, :a1, :K) => (2, :a1, :K))
     bind!(prob, (1, :a1, :Γ) => (1, :a2, :Γ) => (2, :a1, :Γ) => (2, :a2, :Γ))
@@ -109,29 +140,27 @@ begin
     bind!(prob, (1, :a2, :logXi) => (2, :a2, :logXi))
     bind!(prob, (1, :a2, :density) => (2, :a2, :density))
     FreezeAll(modelA)
+    FreezeAll(modelB)
     modelA.a1.K.frozen = false
     modelA.a1.Γ.frozen = false
     modelA.a1.β.frozen = false
+    modelB.m1.value.frozen = false
     details(prob)
 end
 
-##
-
+#= @time begin
 result = fit(prob, LevenbergMarquadt(), autodiff = :finite, verbose = true)
-
-ApplyResult(result,modelA,modelB)
-plot_res(dataA,dataB,result)
-##
-
+end
 result_PL_fit = deepcopy(result)
+ApplyResult(result,modelA,modelB)
+#plot_res(dataA,dataB,result) =#
 
-#begin
-details(prob)
+begin
 modelA.c1.h.frozen = false
 modelA.c1.θ.frozen = false
 modelA.c1.a.frozen = false
 modelA.a2.K.frozen = false 
-modelA.a2.K = 1 
+modelA.a2.K = 5 
 modelB.a2.K.frozen = false 
 modelB.a2.K = 1 
 bind!(prob, (1, :a2, :K) => (2, :a2, :K))
@@ -139,19 +168,15 @@ modelA.a2.A_Fe.frozen = false
 modelA.a2.logXi.frozen = false
 modelA.a2.density.frozen = false
 details(prob)
-#end
-@time begin
-result = fit(prob, LevenbergMarquadt(), autodiff = :finite, verbose = true)
 end
 
+
+@time begin
+result = fit(prob, LevenbergMarquadt(), autodiff = :finite, verbose = true, maxIter=10000)
+end
+
+
 result_LP_fit = deepcopy(result)
-
-plot_res(dataA,dataB,result)
-
 ApplyResult(result,modelA,modelB)
 details(prob)
-modelA.m2.ηH = 0
-modelA.m2.ηH.frozen = true
-modelA.a2.A_Fe = 1
-modelA.a2.A_Fe.frozen = true
-modelA.c1.model.θ = 27
+#plot_res(dataA,dataB,result)

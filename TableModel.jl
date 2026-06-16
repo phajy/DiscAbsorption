@@ -1,24 +1,20 @@
 using SpectralFitting, XSPECModels, Relxill, Warmabs, CFITSIO, Plots, Base.Threads
 include("gradus-lamp-post.jl")
 # as an example I'm initiating a model and setting some parameters. The upper and lower limits set will be the high and low values for which spectra will be created 
-Threads.nthreads() = 32
-convmodel = LampPost(
-    h = FitParam(1.5,lower_limit = 1.5, upper_limit = 100., frozen = false),
-    E = FitParam(1.0,lower_limit = 1., upper_limit = 10., frozen = true),
-    R_in = FitParam(-1.,lower_limit= -Inf,frozen = true),
-    R_out = FitParam(400., lower_limit=-Inf, frozen = true), 
-    θ = FitParam(30.,lower_limit=7,upper_limit=85, frozen = true),
-    a = FitParam(0.998,lower_limit=-0.998,upper_limit=0.998, frozen = true))
-    
-specmodel = XillverD5(
-    Γ = FitParam(2.3,lower_limit = 1, upper_limit = 3., frozen = false),
-    A_Fe = FitParam(1.0,lower_limit = 1., upper_limit = 100., frozen = false),
-    logXi = FitParam(3.,lower_limit= 2., upper_limit = 4.,frozen = false),
-    density = FitParam(17., lower_limit=15., upper_limit=19., frozen = false), 
-    inclination = FitParam(30.,lower_limit=7,upper_limit=85, frozen = true))
-        
-convolution_model = AsConvolution(convmodel)
-model = convolution_model(specmodel)
+Threads.nthreads() = 40
+
+model = FullModel(
+    #r = FitParam(10.,lower_limit = 1.5, upper_limit = 5., frozen = true),
+    h = FitParam(5.,lower_limit = 2.0, upper_limit = 50., frozen = false),
+    R_in = FitParam(1.,lower_limit= 1. ,upper_limit=100, frozen = true),
+    R_out = FitParam(400., lower_limit=400. ,upper_limit=600., frozen = true), 
+    θ = FitParam(35.,lower_limit=20.,upper_limit=35., frozen = false),
+    a = FitParam(0.75,lower_limit=0.5,upper_limit=0.998, frozen = false),
+    Γ = FitParam(2.0,lower_limit = 1., upper_limit = 3., frozen = false),
+    A_Fe = FitParam(1.0,lower_limit = 0.5, upper_limit = 10., frozen = true),
+    logXi = FitParam(3.0,lower_limit= 2.0, upper_limit = 4.0,frozen = false),
+    density = FitParam(17.0, lower_limit=15., upper_limit=19., frozen = false)
+    )
 
 full_model_vals , model_names = SpectralFitting._all_parameters_with_names(model)
         
@@ -44,14 +40,14 @@ frozen_param_values = filter(x -> !SpectralFitting.isfree(x), full_model_vals)
 
 #function MakeTable(model,outName)
     SPECTRA_Units = "photons/cm^2/s"
-    Out_path = "LampPostHigher.fits"
+    Out_path = "LampPost_Larger_Energy_Specific_bigger_2.fits"
     REDSHIFT = "F"
     ESCALE = "F"
-    logged = [1, 0, 1, 0, 0]
-    NumbVals = [10, 5, 5, 10, 10]
-    ENERGIES_Nbins = 1000
+    logged = [1, 0, 0, 0, 0, 0]
+    NumbVals = [10, 10, 10, 5, 10, 10]
+    ENERGIES_Nbins = 800
     E_Min = 0.1
-    E_Max = 20.0
+    E_Max = 78.0
     
     Model_Name = splitpath(Out_path)[end]
     file_name = splitpath(Out_path)[end]
@@ -206,6 +202,7 @@ for chunk in chunks
     # Compute spectra in parallel within the chunk
     Threads.@threads for local_idx in 1:n_in_chunk
         j = chunk_indices[local_idx]
+
         ps = iter_params[j]
         
         # Create a thread-local copy of the model to avoid race conditions
@@ -223,12 +220,15 @@ for chunk in chunks
                 end
             end
         end
+        println("Starting spectra $j")        
         chunk_results[local_idx] = invokemodel(Energies, local_model).parent[:, 1]
+        println("Finished spectra $j")            
     end
     
     # Write results serially (thread-safe)
     for local_idx in 1:n_in_chunk
         j = chunk_indices[local_idx]
+        println("Writing $j")
         fits_write_col(f, 2, j, 1, chunk_results[local_idx])
     end
 end
