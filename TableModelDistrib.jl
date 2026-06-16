@@ -45,8 +45,9 @@ using CFITSIO
 
 include(_GRADUS_FILE)
 
-model = FullModel(
-    h = FitParam(5., lower_limit = 2.0, upper_limit = 50., frozen = false),
+model = FullModelRing(
+    r = FitParam(5., lower_limit = 2., upper_limit = 10., frozen = false),
+    h = FitParam(5., lower_limit = 2., upper_limit = 50., frozen = false),
     R_in = FitParam(1., lower_limit = 1., upper_limit = 100, frozen = true),
     R_out = FitParam(400., lower_limit = 400., upper_limit = 600., frozen = true),
     θ = FitParam(35., lower_limit = 20., upper_limit = 35., frozen = false),
@@ -82,8 +83,8 @@ SPECTRA_Units = "photons/cm^2/s"
 Out_path = "LampPost_Larger_Energy_Specific_bigger_2.fits"
 REDSHIFT = "F"
 ESCALE = "F"
-logged = [1, 0, 0, 0, 0, 0]
-NumbVals = [10, 10, 10, 5, 10, 10]
+logged = [0, 1, 0, 0, 0, 0, 0]
+NumbVals = [10, 10, 10, 10, 5, 10, 10]
 ENERGIES_Nbins = 800
 E_Min = 0.1
 E_Max = 78.0
