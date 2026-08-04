@@ -137,7 +137,6 @@ function SpectralFitting.invoke!(output, domain, model::FullModel)
 end
 
 println("FullModel Loaded")
-##
 struct RingCoronaLine{T} <: AbstractSpectralModel{T,Additive}
     "Normalisation"
     K::T
@@ -255,7 +254,3 @@ function SpectralFitting.invoke!(output, domain, model::FullModelRing)
 end
 
 println("FullModelRing Loaded")
-
-energies = collect(logrange(2.5,90.0,900))
-ring_spec = invokemodel(energies,FullModelRing(r=FitParam(1.5),h=FitParam(1.5)))
-plot(energies[1:end-1],ring_spec,xscale=:log10,yscale=:log10)

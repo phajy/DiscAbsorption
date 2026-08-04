@@ -1,18 +1,19 @@
 using SpectralFitting, XSPECModels, Relxill, Warmabs, CFITSIO, Plots, Base.Threads
-include("gradus-lamp-post.jl")
+#include("gradus-lamp-post.jl")
+include("Kerrz/Kerrz-lineprof.jl")
 # as an example I'm initiating a model and setting some parameters. The upper and lower limits set will be the high and low values for which spectra will be created 
-Threads.nthreads() = 40
+Threads.nthreads() = 32
 
-model = FullModel(
-    #r = FitParam(10.,lower_limit = 1.5, upper_limit = 5., frozen = true),
-    h = FitParam(5.,lower_limit = 2.0, upper_limit = 50., frozen = false),
-    R_in = FitParam(1.,lower_limit= 1. ,upper_limit=100, frozen = true),
-    R_out = FitParam(400., lower_limit=400. ,upper_limit=600., frozen = true), 
-    θ = FitParam(35.,lower_limit=20.,upper_limit=35., frozen = false),
-    a = FitParam(0.75,lower_limit=0.5,upper_limit=0.998, frozen = false),
-    Γ = FitParam(2.0,lower_limit = 1., upper_limit = 3., frozen = false),
-    A_Fe = FitParam(1.0,lower_limit = 0.5, upper_limit = 10., frozen = true),
-    logXi = FitParam(3.0,lower_limit= 2.0, upper_limit = 4.0,frozen = false),
+model = FullModelRingKerrz(
+    r = FitParam(10.,lower_limit = 1.5, upper_limit = 10., frozen = false),
+    h = FitParam(5.,lower_limit = 1.5, upper_limit = 50., frozen = false),
+    R_in = FitParam(-1.,lower_limit= 1. ,upper_limit=100, frozen = true),
+    R_out = FitParam(100., lower_limit=400. ,upper_limit=600., frozen = true), 
+    θ = FitParam(35.,lower_limit=10.,upper_limit=60., frozen = false),
+    a = FitParam(0.75,lower_limit=0.1,upper_limit=0.998, frozen = false),
+    Γ = FitParam(2.0,lower_limit = 1.1, upper_limit = 3.0, frozen = false),
+    A_Fe = FitParam(1.0,lower_limit = 0.5, upper_limit = 10., frozen = false),
+    logXi = FitParam(3.0,lower_limit= 1.0, upper_limit = 4.0,frozen = false),
     density = FitParam(17.0, lower_limit=15., upper_limit=19., frozen = false)
     )
 
@@ -40,14 +41,15 @@ frozen_param_values = filter(x -> !SpectralFitting.isfree(x), full_model_vals)
 
 #function MakeTable(model,outName)
     SPECTRA_Units = "photons/cm^2/s"
-    Out_path = "LampPost_Larger_Energy_Specific_bigger_2.fits"
+    Out_path = "Ring_Kerrz-test.fits"
     REDSHIFT = "F"
     ESCALE = "F"
-    logged = [1, 0, 0, 0, 0, 0]
-    NumbVals = [10, 10, 10, 5, 10, 10]
-    ENERGIES_Nbins = 800
+    logged = [0, 1, 0, 0, 0, 0, 0, 0]
+    NumbVals = [10, 10, 10, 5, 10, 10, 10, 10]
+    #NumbVals = [2, 2, 2, 2, 2, 2, 2, 2]
+    ENERGIES_Nbins = 1000
     E_Min = 0.1
-    E_Max = 78.0
+    E_Max = 80.0
     
     Model_Name = splitpath(Out_path)[end]
     file_name = splitpath(Out_path)[end]

@@ -1,11 +1,8 @@
-using Plots, SpectralFitting, XSPECModels, Relxill, CFITSIO, Base.Threads, Gradus
-include("../gradus-lamp-post.jl")
+using Plots, SpectralFitting, CFITSIO, Base.Threads, Gradus
 
-cur_dir = pwd()
-kerrz = "/Users/er19801/kerrz/kerrz-0.1.12-65305f2f7efade22ec09597417524d8afab01676-aarch64-macos-none"
 Threads.nthreads() = 20
 
-#ring corona
+#ring corona line
 
 struct RingCoronaLineKerrz{T} <: AbstractSpectralModel{T,Additive}
     "Normalisation"
@@ -38,6 +35,9 @@ function RingCoronaLineKerrz(;K = FitParam(1.0),
 end
 
 function SpectralFitting.invoke!(output, domain, model::RingCoronaLineKerrz)
+    cur_dir = pwd()
+    #kerrz = "/Users/er19801/kerrz/kerrz-0.1.12-65305f2f7efade22ec09597417524d8afab01676-aarch64-macos-none"
+    kerrz = "/Users/er19801/Kerrz/kerrz/kerrz"
     ID = Threads.threadid()
     emisivity_out_file = "emisivity_$(ID)_temp.dat"
     lineprof_out_file = "lineprof_$(ID)_temp.dat"
@@ -56,9 +56,14 @@ function SpectralFitting.invoke!(output, domain, model::RingCoronaLineKerrz)
         R_Out = model.R_out
     end 
 
-    run(`$kerrz emissivity --photon-index $(model.Γ) --nthreads $(Threads.nthreads()) --ring-like h:$(model.h),x:$(model.r) --output-file $cur_dir/$emisivity_out_file`)
+    println("Writing Emissivity")
+    run(`$kerrz emissivity --velocity corotate --photon-index $(model.Γ) --nthreads $(Threads.nthreads()) --ring-like h:$(model.h),x:$(model.r) --output $cur_dir/$emisivity_out_file`)
     
+    println("Writing LineProf")
     run(`$kerrz lineprof  --nradii 100 --nangles 200 --spin $(model.a) --incl $(model.θ) --ng $domain_size --rin $R_In --rout $R_Out --emissivity-profile  $cur_dir/$emisivity_out_file --output $cur_dir/$lineprof_out_file`)
+
+    
+
 
     rm("$cur_dir/$emisivity_out_file")
     
@@ -69,33 +74,72 @@ function SpectralFitting.invoke!(output, domain, model::RingCoronaLineKerrz)
     output .= lineprof[2,:][1:end-1]./(sum(lineprof[2,:][1:end-1].*lineprof[1,:][1:end-1]))
 end
 
-energies = collect(range(0,2,1000))
+#ring corona full 
 
-@time begin
-spec_Kerrz = invokemodel(energies,RingCoronaLineKerrz(;K = FitParam(1.0),
-    r = FitParam(4.,lower_limit = 1.5, upper_limit = 100., frozen = false),
-    h = FitParam(6.,lower_limit = 1.5, upper_limit = 100., frozen = false),
-    Γ = FitParam(2.0,lower_limit = 1, upper_limit = 3., frozen = false),
-    R_in = FitParam(-1.,lower_limit= -Inf,frozen = true),
-    R_out = FitParam(400., lower_limit=-Inf, frozen = true), 
-    θ = FitParam(60.,lower_limit=7,upper_limit=85),
-    a = FitParam(0.998,lower_limit=-0.998,upper_limit=0.998)))
-plot(energies[1:end-1],spec_Kerrz,label="Kerrz",title="Ring Corona")
+struct FullModelRingKerrz{T} <: AbstractSpectralModel{T,Additive}
+    "Normalisation"
+    K::T
+    "Ring Radius"
+    r::T
+    "Ring Height"
+    h::T
+    "Inner Radius"
+    R_in::T
+    "Outer Radius"
+    R_out::T
+    "Inclination"
+    θ::T
+    "Spin"
+    a::T
+    "Photon Index"
+    Γ::T
+    "Iron Abundance"
+    A_Fe::T
+    "Ionisation Parameter"
+    logXi::T
+    "density"
+    density::T
 end
 
-@time begin
-    spec_Gradus = invokemodel(energies,RingCoronaLine(;K = FitParam(1.0),
-    r = FitParam(4.,lower_limit = 1.5, upper_limit = 100., frozen = false),
-    h = FitParam(6.,lower_limit = 1.5, upper_limit = 100., frozen = false),
-    E = FitParam(1.0,lower_limit = 1, upper_limit = 3., frozen = false),
-    R_in = FitParam(-1.,lower_limit= -Inf,frozen = true),
-    R_out = FitParam(400., lower_limit=-Inf, frozen = true), 
-    θ = FitParam(60.,lower_limit=7,upper_limit=85),
-    a = FitParam(0.998,lower_limit=-0.998,upper_limit=0.998)))
-    plot!(energies[1:end-1],spec_Gradus,label="Gradus")
+function FullModelRingKerrz(;K = FitParam(1.0),
+    r = FitParam(5.,lower_limit = 1.5, upper_limit = 100., frozen = false),
+    h = FitParam(5.,lower_limit = 1.5, upper_limit = 100., frozen = false),
+    R_in = FitParam(0.,lower_limit= -Inf,frozen = true),
+    R_out = FitParam(Inf, lower_limit=-Inf, frozen = true), 
+    θ = FitParam(30.,lower_limit=7,upper_limit=85, frozen = false),
+    a = FitParam(0.7,lower_limit=0.0,upper_limit=0.998, frozen = false),
+    Γ = FitParam(2.3,lower_limit = 1, upper_limit = 3., frozen = false),
+    A_Fe = FitParam(1.0,lower_limit = 0.1, upper_limit = 100., frozen = true),
+    logXi = FitParam(3.0,lower_limit= 2., upper_limit = 4.,frozen = false),
+    density = FitParam(17., lower_limit=15., upper_limit=19., frozen = false))
+    FullModelRingKerrz(K,r,h,R_in,R_out,θ,a,Γ,A_Fe,logXi,density)
 end
 
-##Lamp Post
+function SpectralFitting.invoke!(output, domain, model::FullModelRingKerrz)
+    convmodel = RingCoronaLineKerrz(
+    K = FitParam(1.0),
+    r = FitParam(model.r),
+    h = FitParam(model.h),
+    Γ = FitParam(model.Γ),
+    R_in = FitParam(model.R_in),
+    R_out = FitParam(model.R_out), 
+    θ = FitParam(model.θ),
+    a = FitParam(model.a))
+    
+    specmodel = XillverD5(
+    K = FitParam(model.K),
+    Γ = FitParam(model.Γ),
+    A_Fe = FitParam(model.A_Fe),
+    logXi = FitParam(model.logXi),
+    density = FitParam(model.density), 
+    inclination = FitParam(model.θ))
+        
+    convolution_model = AsConvolution(convmodel)
+    Fmodel = convolution_model(specmodel)
+    output .= invokemodel(domain,Fmodel)
+end
+
+#Lamp Post line
 
 struct LPCoronaLineKerrz{T} <: AbstractSpectralModel{T,Additive}
     "Normalisation"
@@ -125,6 +169,9 @@ function LPCoronaLineKerrz(;K = FitParam(1.0),
 end
 
 function SpectralFitting.invoke!(output, domain, model::LPCoronaLineKerrz)
+    cur_dir = pwd()
+    #kerrz = "/Users/er19801/kerrz/kerrz-0.1.12-65305f2f7efade22ec09597417524d8afab01676-aarch64-macos-none"
+    kerrz = "kerrzcli"
     ID = Threads.threadid()
     emisivity_out_file = "emisivity_$(ID)_temp.dat"
     lineprof_out_file = "lineprof_$(ID)_temp.dat"
@@ -143,7 +190,12 @@ function SpectralFitting.invoke!(output, domain, model::LPCoronaLineKerrz)
         R_Out = model.R_out
     end 
 
-    run(`$kerrz emissivity --spin $(model.a) --photon-index $(model.Γ) --output-file $cur_dir/$emisivity_out_file --nphotons 10000 --nthreads $(Threads.nthreads()) --lamppost h:$(model.h),vr:0.0`)
+    println("$kerrz emissivity --velocity corotate --spin $(model.a) --photon-index $(model.Γ) --output-file $cur_dir/$emisivity_out_file --nphotons 500000 --nthreads $(Threads.nthreads()) --lamppost h:$(model.h),vr:0.0")
+    
+    println("$kerrz lineprof  --nradii 100 --nangles 200 --spin $(model.a) --incl $(model.θ) --ng $domain_size --rin $R_In --rout $R_Out --emissivity-profile  $cur_dir/$emisivity_out_file --output $cur_dir/$lineprof_out_file")
+
+
+    run(`$kerrz emissivity --velocity corotate --spin $(model.a) --photon-index $(model.Γ) --output-file $cur_dir/$emisivity_out_file --nphotons 3000 --nthreads $(Threads.nthreads()) --lamppost h:$(model.h),vr:0.0`)
     
     run(`$kerrz lineprof  --nradii 100 --nangles 200 --spin $(model.a) --incl $(model.θ) --ng $domain_size --rin $R_In --rout $R_Out --emissivity-profile  $cur_dir/$emisivity_out_file --output $cur_dir/$lineprof_out_file`)
 
@@ -156,24 +208,84 @@ function SpectralFitting.invoke!(output, domain, model::LPCoronaLineKerrz)
     output .= lineprof[2,:][1:end-1]./(sum(lineprof[2,:][1:end-1].*lineprof[1,:][1:end-1]))
 end
 
-@time begin
-spec_Kerrz = invokemodel(energies,LPCoronaLineKerrz(;K = FitParam(1.0),
-    h = FitParam(8.,lower_limit = 1.5, upper_limit = 100., frozen = false),
-    Γ = FitParam(2.0,lower_limit = 1, upper_limit = 3., frozen = false),
-    R_in = FitParam(-1.,lower_limit= -Inf,frozen = true),
-    R_out = FitParam(400., lower_limit=-Inf, frozen = true), 
-    θ = FitParam(60.,lower_limit=7,upper_limit=85),
-    a = FitParam(0.998,lower_limit=-0.998,upper_limit=0.998)))
-plot(energies[1:end-1],spec_Kerrz,label="Kerrz",title="Lamp Post Corona")
+#Lamp Post full
+
+struct FullModelLPKerrz{T} <: AbstractSpectralModel{T,Additive}
+    "Normalisation"
+    K::T
+    "Corona Height"
+    h::T
+    "Inner Radius"
+    R_in::T
+    "Outer Radius"
+    R_out::T
+    "Inclination"
+    θ::T
+    "Spin"
+    a::T
+    "Photon Index"
+    Γ::T
+    "Iron Abundance"
+    A_Fe::T
+    "Ionisation Parameter"
+    logXi::T
+    "density"
+    density::T
 end
 
-@time begin
-    spec_Gradus = invokemodel(energies,LampPost(;K = FitParam(1.0),
-    h = FitParam(6.,lower_limit = 1.5, upper_limit = 100., frozen = false),
-    E = FitParam(1.0,lower_limit = 1, upper_limit = 3., frozen = false),
-    R_in = FitParam(-1.,lower_limit= -Inf,frozen = true),
-    R_out = FitParam(400., lower_limit=-Inf, frozen = true), 
-    θ = FitParam(60.,lower_limit=7,upper_limit=85),
-    a = FitParam(0.998,lower_limit=-0.998,upper_limit=0.998)))
-    plot!(energies[1:end-1],spec_Gradus,label="Gradus")
+function FullModelLPKerrz(;K = FitParam(1.0),
+    h = FitParam(5.,lower_limit = 1.5, upper_limit = 100., frozen = false),
+    R_in = FitParam(0.,lower_limit= -Inf,frozen = true),
+    R_out = FitParam(Inf, lower_limit=-Inf, frozen = true), 
+    θ = FitParam(30.,lower_limit=7,upper_limit=85, frozen = false),
+    a = FitParam(0.7,lower_limit=0.0,upper_limit=0.998, frozen = false),
+    Γ = FitParam(2.3,lower_limit = 1, upper_limit = 3., frozen = false),
+    A_Fe = FitParam(1.0,lower_limit = 0.1, upper_limit = 100., frozen = true),
+    logXi = FitParam(3.0,lower_limit= 2., upper_limit = 4.,frozen = false),
+    density = FitParam(17., lower_limit=15., upper_limit=19., frozen = false))
+    FullModelLPKerrz(K,h,R_in,R_out,θ,a,Γ,A_Fe,logXi,density)
 end
+
+function SpectralFitting.invoke!(output, domain, model::FullModelLPKerrz)
+    convmodel = LPCoronaLineKerrz(
+    K = FitParam(1.0),
+    h = FitParam(model.h),
+    Γ = FitParam(model.Γ),
+    R_in = FitParam(model.R_in),
+    R_out = FitParam(model.R_out), 
+    θ = FitParam(model.θ),
+    a = FitParam(model.a))
+    
+    specmodel = XillverD5(
+    K = FitParam(model.K),
+    Γ = FitParam(model.Γ),
+    A_Fe = FitParam(model.A_Fe),
+    logXi = FitParam(model.logXi),
+    density = FitParam(model.density), 
+    inclination = FitParam(model.θ))
+        
+    convolution_model = AsConvolution(convmodel)
+    Fmodel = convolution_model(specmodel)
+    output .= invokemodel(domain,Fmodel)
+end
+
+#= #plotting energies
+line_energies = collect(range(0,2,1000))
+spec_energies = collect(logrange(0.1,100,1000))
+
+# Ring corona
+@time begin
+spec_Kerrz = invokemodel(spec_energies,FullModelRingKerrz(
+    r = FitParam(1.5,lower_limit = 1.5, upper_limit = 10., frozen = false),
+    h = FitParam(5.5,lower_limit = 1.5, upper_limit = 50., frozen = false),
+    R_in = FitParam(-1.,lower_limit= 1. ,upper_limit=100, frozen = true),
+    R_out = FitParam(400., lower_limit=400. ,upper_limit=600., frozen = true), 
+    θ = FitParam(10.,lower_limit=10.,upper_limit=85., frozen = false),
+    a = FitParam(0.1,lower_limit=0.0,upper_limit=0.998, frozen = false),
+    Γ = FitParam(1.1,lower_limit = 1., upper_limit = 4., frozen = false),
+    A_Fe = FitParam(1.5,lower_limit = 0.5, upper_limit = 10., frozen = false),
+    logXi = FitParam(0.0,lower_limit= 0.0, upper_limit = 4.0,frozen = false),
+    density = FitParam(15.0, lower_limit=15., upper_limit=19., frozen = false)
+    ))
+plot(spec_energies[1:end-1],spec_Kerrz,xscale=:log10,yscale=:log10,label="Kerrz",title="Ring Corona")
+end =#
