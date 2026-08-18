@@ -1,9 +1,37 @@
-r = FitParam(10.,lower_limit = 1.5, upper_limit = 10., frozen = false)
-h = FitParam(5.,lower_limit = 1.5, upper_limit = 50., frozen = false)
+using Gradus
+
+function addparams(A,B)
+    out = []
+    for a in A
+        for b in B
+            push!(out,[a; b])
+        end
+    end
+    return out
+end
+
+function multiplyparams(V)
+    out = V[1]
+    for i in 2:length(V)
+        out = addparams(out,V[i])
+    end
+    return out
+end
+
+rm("Kerrz/Table", recursive=true)
+
+kerrz = "/data/typhon2/DariusM/kerrz/zig-out/bin/kerrz"
+
+mkdir("Kerrz/Table")
 
 rs = collect(range(1.5,10.0,10))
 hs = collect(logrange(1.5,50.0,10))
+Γs = collect(range(1.0,3.0,10))
+params = [rs, hs, Γs]
 
-run(`$kerrz emissivity --velocity corotate --photon-index $(model.Γ) --nthreads $(Threads.nthreads()) --ring-like h:$(model.h),x:$(model.r) --output $cur_dir/$emisivity_out_file`)
+listparam = multiplyparams(params)
 
-run(`$kerrz lineprof  --nradii 100 --nangles 200 --spin $(model.a) --incl $(model.θ) --ng $domain_size --rin $R_In --rout $R_Out --emissivity-profile  $cur_dir/$emisivity_out_file --output $cur_dir/$lineprof_out_file`)
+for p in listparam
+    emisivity_out_file = "Kerrz/Table/emsvty_g$(p[3])_h$(p[2])_r$(p[1])"
+    run(`$kerrz emissivity --velocity corotate --photon-index $(p[3]) --nthreads $(Threads.nthreads()) --ring-like h:$(p[2]),x:$(p[1]) --output $emisivity_out_file.dat`)
+end

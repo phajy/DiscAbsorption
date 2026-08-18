@@ -1,6 +1,6 @@
 using Plots, SpectralFitting, CFITSIO, Base.Threads, Gradus
 
-Threads.nthreads() = 20
+Threads.nthreads() = 1
 
 #ring corona line
 
@@ -24,9 +24,9 @@ struct RingCoronaLineKerrz{T} <: AbstractSpectralModel{T,Additive}
 end
 
 function RingCoronaLineKerrz(;K = FitParam(1.0),
-    r = FitParam(2.,lower_limit = 1.5, upper_limit = 100., frozen = false),
-    h = FitParam(2.,lower_limit = 1.5, upper_limit = 100., frozen = false),
-    Γ = FitParam(2.3,lower_limit = 1, upper_limit = 3., frozen = false),
+    r = FitParam(2.,lower_limit = 1.5, upper_limit = 10., frozen = false),
+    h = FitParam(2.,lower_limit = 1.5, upper_limit = 50., frozen = false),
+    Γ = FitParam(2.3,lower_limit = 1.0, upper_limit = 3., frozen = false),
     R_in = FitParam(-1.,lower_limit= -Inf,frozen = true),
     R_out = FitParam(400., lower_limit=-Inf, frozen = true), 
     θ = FitParam(30.,lower_limit=7,upper_limit=85),
@@ -37,9 +37,9 @@ end
 function SpectralFitting.invoke!(output, domain, model::RingCoronaLineKerrz)
     cur_dir = pwd()
     #kerrz = "/Users/er19801/kerrz/kerrz-0.1.12-65305f2f7efade22ec09597417524d8afab01676-aarch64-macos-none"
-    kerrz = "/Users/er19801/Kerrz/kerrz/kerrz"
+    kerrz = "/data/typhon2/DariusM/kerrz/zig-out/bin/kerrz"
     ID = Threads.threadid()
-    emisivity_out_file = "emisivity_$(ID)_temp.dat"
+    emisivity_out_file = "Kerrz/Table/emsvty_g$(model.Γ)_h$(model.h)_r$(model.r).dat"
     lineprof_out_file = "lineprof_$(ID)_temp.dat"
 
     g_domain = copy(domain)
@@ -56,8 +56,8 @@ function SpectralFitting.invoke!(output, domain, model::RingCoronaLineKerrz)
         R_Out = model.R_out
     end 
 
-    println("Writing Emissivity")
-    run(`$kerrz emissivity --velocity corotate --photon-index $(model.Γ) --nthreads $(Threads.nthreads()) --ring-like h:$(model.h),x:$(model.r) --output $cur_dir/$emisivity_out_file`)
+    #println("Writing Emissivity")
+    #run(`$kerrz emissivity --velocity corotate --photon-index $(model.Γ) --nthreads $(Threads.nthreads()) --ring-like h:$(model.h),x:$(model.r) --output $cur_dir/$emisivity_out_file`)
     
     println("Writing LineProf")
     run(`$kerrz lineprof  --nradii 100 --nangles 200 --spin $(model.a) --incl $(model.θ) --ng $domain_size --rin $R_In --rout $R_Out --emissivity-profile  $cur_dir/$emisivity_out_file --output $cur_dir/$lineprof_out_file`)
@@ -65,7 +65,7 @@ function SpectralFitting.invoke!(output, domain, model::RingCoronaLineKerrz)
     
 
 
-    rm("$cur_dir/$emisivity_out_file")
+    #rm("$cur_dir/$emisivity_out_file")
     
     lineprof = parse.(Float64,reduce(hcat, split.(readlines(lineprof_out_file),", ")))
     
@@ -190,9 +190,9 @@ function SpectralFitting.invoke!(output, domain, model::LPCoronaLineKerrz)
         R_Out = model.R_out
     end 
 
-    println("$kerrz emissivity --velocity corotate --spin $(model.a) --photon-index $(model.Γ) --output-file $cur_dir/$emisivity_out_file --nphotons 500000 --nthreads $(Threads.nthreads()) --lamppost h:$(model.h),vr:0.0")
+    #println("$kerrz emissivity --velocity corotate --spin $(model.a) --photon-index $(model.Γ) --output-file $cur_dir/$emisivity_out_file --nphotons 500000 --nthreads $(Threads.nthreads()) --lamppost h:$(model.h),vr:0.0")
     
-    println("$kerrz lineprof  --nradii 100 --nangles 200 --spin $(model.a) --incl $(model.θ) --ng $domain_size --rin $R_In --rout $R_Out --emissivity-profile  $cur_dir/$emisivity_out_file --output $cur_dir/$lineprof_out_file")
+    #println("$kerrz lineprof  --nradii 100 --nangles 200 --spin $(model.a) --incl $(model.θ) --ng $domain_size --rin $R_In --rout $R_Out --emissivity-profile  $cur_dir/$emisivity_out_file --output $cur_dir/$lineprof_out_file")
 
 
     run(`$kerrz emissivity --velocity corotate --spin $(model.a) --photon-index $(model.Γ) --output-file $cur_dir/$emisivity_out_file --nphotons 3000 --nthreads $(Threads.nthreads()) --lamppost h:$(model.h),vr:0.0`)
