@@ -1,4 +1,4 @@
-using SpectralFitting, XSPECModels, Relxill, Warmabs, CFITSIO, Plots, Base.Threads
+using SpectralFitting, XSPECModels, Relxill, CFITSIO, Plots, Base.Threads
 #include("gradus-lamp-post.jl")
 include("Kerrz/Kerrz-lineprof.jl")
 # as an example I'm initiating a model and setting some parameters. The upper and lower limits set will be the high and low values for which spectra will be created 
@@ -191,6 +191,7 @@ fits_write_col(f, 1, 1, 1, vec(stack(iter_params)))
 
 # Process in chunks: compute in parallel, then write serially
 # Chunk size controls memory usage (number of spectra held in memory at once)
+println(Threads.nthreads())
 chunk_size = min(1, cld(length(iter_params), Threads.nthreads()))
 chunks = Iterators.partition(eachindex(iter_params), chunk_size)
 

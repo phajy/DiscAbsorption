@@ -38,9 +38,9 @@ function SpectralFitting.invoke!(output, domain, model::RingCoronaLineKerrz)
     cur_dir = pwd()
     #kerrz = "/Users/er19801/kerrz/kerrz-0.1.12-65305f2f7efade22ec09597417524d8afab01676-aarch64-macos-none"
     kerrz = "/data/typhon2/DariusM/kerrz/zig-out/bin/kerrz"
-    ID = Threads.threadid()
+    #ID = Threads.threadid()
     emisivity_out_file = "Kerrz/Table/emsvty_g$(model.Γ)_h$(model.h)_r$(model.r).dat"
-    lineprof_out_file = "lineprof_$(ID)_temp.dat"
+    lineprof_out_file = "lineprof_g$(model.Γ)_h$(model.h)_r$(model.r)_th$(model.θ)_a$(model.a).dat"
 
     g_domain = copy(domain)
     domain_size = length(g_domain)
@@ -62,15 +62,13 @@ function SpectralFitting.invoke!(output, domain, model::RingCoronaLineKerrz)
     println("Writing LineProf")
     run(`$kerrz lineprof  --nradii 100 --nangles 200 --spin $(model.a) --incl $(model.θ) --ng $domain_size --rin $R_In --rout $R_Out --emissivity-profile  $cur_dir/$emisivity_out_file --output $cur_dir/$lineprof_out_file`)
 
-    
-
 
     #rm("$cur_dir/$emisivity_out_file")
     
     lineprof = parse.(Float64,reduce(hcat, split.(readlines(lineprof_out_file),", ")))
     
     rm("$cur_dir/$lineprof_out_file")
-
+    
     output .= lineprof[2,:][1:end-1]./(sum(lineprof[2,:][1:end-1].*lineprof[1,:][1:end-1]))
 end
 
@@ -201,7 +199,7 @@ function SpectralFitting.invoke!(output, domain, model::LPCoronaLineKerrz)
 
     rm("$cur_dir/$emisivity_out_file")
     
-    lineprof = parse.(Float64,reduce(hcat, split.(readlines(lineprof_out_file),", ")))
+    lineprof = parse.(Float64,reduce(hcat, split.(readlines(joinpath(cur_dir,lineprof_out_file)),", ")))
     
     rm("$cur_dir/$lineprof_out_file")
 
