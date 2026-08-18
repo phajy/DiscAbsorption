@@ -2,7 +2,7 @@ using SpectralFitting, XSPECModels, Relxill, Warmabs, CFITSIO, Plots, Base.Threa
 #include("gradus-lamp-post.jl")
 include("Kerrz/Kerrz-lineprof.jl")
 # as an example I'm initiating a model and setting some parameters. The upper and lower limits set will be the high and low values for which spectra will be created 
-Threads.nthreads() = 32
+Threads.nthreads() = 1
 
 model = FullModelRingKerrz(
     r = FitParam(10.,lower_limit = 1.5, upper_limit = 10., frozen = false),
@@ -11,7 +11,7 @@ model = FullModelRingKerrz(
     R_out = FitParam(100., lower_limit=400. ,upper_limit=600., frozen = true), 
     θ = FitParam(35.,lower_limit=10.,upper_limit=60., frozen = false),
     a = FitParam(0.75,lower_limit=0.1,upper_limit=0.998, frozen = false),
-    Γ = FitParam(2.0,lower_limit = 1.1, upper_limit = 3.0, frozen = false),
+    Γ = FitParam(2.0,lower_limit = 1.0, upper_limit = 3.0, frozen = false),
     A_Fe = FitParam(1.0,lower_limit = 0.5, upper_limit = 10., frozen = false),
     logXi = FitParam(3.0,lower_limit= 1.0, upper_limit = 4.0,frozen = false),
     density = FitParam(17.0, lower_limit=15., upper_limit=19., frozen = false)
@@ -45,8 +45,8 @@ frozen_param_values = filter(x -> !SpectralFitting.isfree(x), full_model_vals)
     REDSHIFT = "F"
     ESCALE = "F"
     logged = [0, 1, 0, 0, 0, 0, 0, 0]
-    NumbVals = [10, 10, 10, 5, 10, 10, 10, 10]
-    #NumbVals = [2, 2, 2, 2, 2, 2, 2, 2]
+    #NumbVals = [10, 10, 10, 5, 10, 10, 10, 10]
+    NumbVals = [10, 10, 2, 2, 10, 2, 2, 2]
     ENERGIES_Nbins = 1000
     E_Min = 0.1
     E_Max = 80.0
@@ -191,7 +191,7 @@ fits_write_col(f, 1, 1, 1, vec(stack(iter_params)))
 
 # Process in chunks: compute in parallel, then write serially
 # Chunk size controls memory usage (number of spectra held in memory at once)
-chunk_size = min(100, cld(length(iter_params), Threads.nthreads()))
+chunk_size = min(1, cld(length(iter_params), Threads.nthreads()))
 chunks = Iterators.partition(eachindex(iter_params), chunk_size)
 
 for chunk in chunks
