@@ -34,8 +34,8 @@ end
 
 function SpectralFitting.invoke!(output, domain, model::RingCoronaLineKerrz)
     cur_dir = pwd()
-    kerrz = "/Users/er19801/kerrz/zig-out/bin/kerrz"
-    #kerrz = "/data/typhon2/DariusM/kerrz/zig-out/bin/kerrz"
+    #kerrz = "/Users/er19801/kerrz/zig-out/bin/kerrz"
+    kerrz = "/data/typhon2/DariusM/kerrz/zig-out/bin/kerrz"
     ID = Threads.threadid()
     emisivity_out_file = "Kerrz/Table/emsvty_g$(model.Γ)_h$(model.h)_r$(model.r).dat"
     #lineprof_out_file = "lineprof_ID$(ID)_g$(model.Γ)_h$(model.h)_r$(model.r)_th$(model.θ)_a$(model.a).dat"
