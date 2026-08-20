@@ -1,7 +1,5 @@
 using Plots, SpectralFitting, CFITSIO, Base.Threads, Gradus
 
-Threads.nthreads() = 1
-
 #ring corona line
 
 struct RingCoronaLineKerrz{T} <: AbstractSpectralModel{T,Additive}
@@ -36,11 +34,12 @@ end
 
 function SpectralFitting.invoke!(output, domain, model::RingCoronaLineKerrz)
     cur_dir = pwd()
-    #kerrz = "/Users/er19801/kerrz/kerrz-0.1.12-65305f2f7efade22ec09597417524d8afab01676-aarch64-macos-none"
-    kerrz = "/data/typhon2/DariusM/kerrz/zig-out/bin/kerrz"
+    kerrz = "/Users/er19801/kerrz/zig-out/bin/kerrz"
+    #kerrz = "/data/typhon2/DariusM/kerrz/zig-out/bin/kerrz"
     ID = Threads.threadid()
     emisivity_out_file = "Kerrz/Table/emsvty_g$(model.Γ)_h$(model.h)_r$(model.r).dat"
-    lineprof_out_file = "lineprof_$(ID)_temp.dat"
+    #lineprof_out_file = "lineprof_ID$(ID)_g$(model.Γ)_h$(model.h)_r$(model.r)_th$(model.θ)_a$(model.a).dat"
+    lineprof_out_file = "lineprof_ID$(rand(10^9:10^10 - 1)).dat"
 
     g_domain = copy(domain)
     domain_size = length(g_domain)
@@ -69,9 +68,9 @@ function SpectralFitting.invoke!(output, domain, model::RingCoronaLineKerrz)
     
     lineprof = parse.(Float64,reduce(hcat, split.(readlines(lineprof_out_file),", ")))
     
-    rm("$cur_dir/$lineprof_out_file")
-
     output .= lineprof[2,:][1:end-1]./(sum(lineprof[2,:][1:end-1].*lineprof[1,:][1:end-1]))
+    println("Removing LineProf $cur_dir/$emisivity_out_file")
+    rm("$cur_dir/$lineprof_out_file")
 end
 
 #ring corona full 
@@ -172,7 +171,7 @@ function SpectralFitting.invoke!(output, domain, model::LPCoronaLineKerrz)
     cur_dir = pwd()
     #kerrz = "/Users/er19801/kerrz/kerrz-0.1.12-65305f2f7efade22ec09597417524d8afab01676-aarch64-macos-none"
     kerrz = "kerrzcli"
-    ID = Threads.threadid()
+    #ID = Threads.threadid()
     emisivity_out_file = "emisivity_$(ID)_temp.dat"
     lineprof_out_file = "lineprof_$(ID)_temp.dat"
 
@@ -180,7 +179,7 @@ function SpectralFitting.invoke!(output, domain, model::LPCoronaLineKerrz)
     domain_size = length(g_domain)
 
     if model.R_in < 0 
-        R_In = abs(model.R_in) * Gradus.isco(KerrMetric(a = model.a))
+        R_In = abs(model.R_in) * Gradus.isco(KerrMetric(a = model.a)) * 1.01
     else
         R_In = model.R_in
     end 

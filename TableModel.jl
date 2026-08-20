@@ -3,6 +3,7 @@ using SpectralFitting, XSPECModels, Relxill, Warmabs, CFITSIO, Plots, Base.Threa
 include("Kerrz/Kerrz-lineprof.jl")
 # as an example I'm initiating a model and setting some parameters. The upper and lower limits set will be the high and low values for which spectra will be created 
 Threads.nthreads() = 1
+min_grp_size = 1
 
 model = FullModelRingKerrz(
     r = FitParam(10.,lower_limit = 1.5, upper_limit = 10., frozen = false),
@@ -191,7 +192,7 @@ fits_write_col(f, 1, 1, 1, vec(stack(iter_params)))
 
 # Process in chunks: compute in parallel, then write serially
 # Chunk size controls memory usage (number of spectra held in memory at once)
-chunk_size = min(1, cld(length(iter_params), Threads.nthreads()))
+chunk_size = min(min_grp_size, cld(length(iter_params), Threads.nthreads()))
 chunks = Iterators.partition(eachindex(iter_params), chunk_size)
 
 for chunk in chunks
