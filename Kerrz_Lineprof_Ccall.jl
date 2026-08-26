@@ -166,13 +166,19 @@ tf_deinit!(r::Ref{KrzCunninghamTransferFunction}) =
     ccall((:krz_CunninghamTransferFunction_deinit, libkerrz), Cvoid,
           (Ptr{KrzCunninghamTransferFunction},), r)
 
-# Copy traces out into a plain Julia array BEFORE calling tf_deinit!,
-# since `traces` points into memory owned by the C/Zig side and becomes
-# invalid once deinit runs.
-function tf_traces(result::Ref{KrzCunninghamTransferFunction})
+# Wrap traces without copying — safe as long as the caller reads/consumes
+# them BEFORE calling tf_deinit!, since deinit is what invalidates the
+# underlying memory (the wrap itself is zero-cost).
+function tf_traces_unsafe(result::Ref{KrzCunninghamTransferFunction})
     r = result[]
     r.num_traces == 0 && return KrzCunninghamTrace[]
-    unsafe_wrap(Vector{KrzCunninghamTrace}, r.traces, r.num_traces; own = false) |> copy
+    unsafe_wrap(Vector{KrzCunninghamTrace}, r.traces, r.num_traces; own = false)
+end
+
+# Copying variant — use only if you need traces to outlive the tf_deinit! call
+# (e.g. storing them for later inspection/debugging).
+function tf_traces(result::Ref{KrzCunninghamTransferFunction})
+    copy(tf_traces_unsafe(result))
 end
 
 # ---------------------------------------------------------------------
@@ -215,7 +221,31 @@ function build_lineprofile(metric::KrzKerrMetric, x_obs::KrzFourVector,
     flux = zeros(Float64, length(g_grid) - 1)
     base_tf_opts = tf_defaults().options
 
+    # Hoisted out of the loop — same options struct reused for every radius,
+    # only r_target changes per-call, so this is built once instead of
+    # `length(r_grid)` times.
+    opts = KrzTFOptions(tf_max_points, base_tf_opts.refine_N,
+                         base_tf_opts.refine_M, base_tf_opts.optimise,
+                         base_tf_opts.minimum_guess, base_tf_opts.heuristic)
+
+    # Direct O(1) bin lookup — only valid because g_grid is uniformly spaced
+    # (as built by `range`/`collect(range(...))` in main()). Falls back to
+    # searchsortedlast if you ever pass a non-uniform grid — check before
+    # relying on this for irregular grids.
+    g0 = g_grid[1]
+    dg = g_grid[2] - g_grid[1]
+    nbins = length(flux)
+    @inline bin_index(g::Float64) = floor(Int, (g - g0) / dg) + 1
+
+    # Per-thread flux accumulators avoid write contention between threads;
+    # summed into `flux` once at the end.
+    nthreads_julia = Threads.nthreads()
+    flux_per_thread = [zeros(Float64, nbins) for _ in 1:nthreads_julia]
+
     for i in eachindex(r_grid)
+        tid = Threads.threadid()
+        local_flux = flux_per_thread[tid]
+
         r = r_grid[i]
 
         # trapezoidal-ish annulus width
@@ -234,34 +264,36 @@ function build_lineprofile(metric::KrzKerrMetric, x_obs::KrzFourVector,
         # etrace.g is the CORONA-TO-DISC energyshift (illumination), distinct
         # from tr.g below, which is the DISC-TO-OBSERVER energyshift. Power-law
         # illumination means the flux hitting the disc scales as g^Γ.
-        em = etrace.em * etrace.g^gamma_index
+        em = etrace.em * etrace.g^(gamma_index-2)
 
         (isnan(em) || isinf(em)) && continue   # skip bad points defensively
 
-        # Disc-to-observer transfer function at this radius
-        opts = KrzTFOptions(tf_max_points, base_tf_opts.refine_N,
-                             base_tf_opts.refine_M, base_tf_opts.optimise,
-                             base_tf_opts.minimum_guess, base_tf_opts.heuristic)
         tool = KrzToolTransferFunction(Cint(0), metric, x_obs, r, opts)
 
         result = tf_run(tool)
-        traces = tf_traces(result)
-        tf_deinit!(result)
+        traces = tf_traces_unsafe(result)   # no-copy read, consumed before deinit below
 
         for tr in traces
             (isnan(tr.g) || isnan(tr.f)) && continue
-            bin = searchsortedlast(g_grid, tr.g)
-            if 1 <= bin <= length(flux)
+            bin = bin_index(tr.g)
+            if 1 <= bin <= nbins
                 # tr.g here is the disc-to-observer energyshift; g^beaming_exponent
                 # is the relativistic beaming term (specific intensity invariance
                 # gives beaming_exponent=3; some conventions fold Γ in here too,
                 # giving g^(3+Γ) instead of separating it as done above — confirm
                 # which convention kerrz's own Lineprofile.zig uses before trusting this)
                 # NOTE: overall weighting convention not yet validated — see module docstring
-                flux[bin] += em * r * dr * tr.f * tr.g^beaming_exponent
+                local_flux[bin] += em * r * dr * tr.f * tr.g^beaming_exponent
             end
         end
+
+        tf_deinit!(result)  # safe now — traces already consumed above
     end
+
+    for lf in flux_per_thread
+        flux .+= lf
+    end
+
 
     emissivity_cache_deinit!(ecache)
     threadpool_deinit!(pool)

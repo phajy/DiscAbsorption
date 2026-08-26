@@ -1,7 +1,7 @@
 using Plots
 
 a = 0.998
-θ = 30.
+θ = 70.
 r = 5.0
 h = 10.
 Γ = 2.0
@@ -9,7 +9,6 @@ h = 10.
 include("Kerrz_Lineprof_Ccall.jl")
 
 @time begin
-    # Example use
     
     metric = make_metric(1.0, a)
     x_obs = KrzFourVector(0.0, 1e6, deg2rad(θ), 0.0)
@@ -22,11 +21,11 @@ include("Kerrz_Lineprof_Ccall.jl")
     g_grid = collect(range(0.0, 2.0; length = 501))  # 100 bins
     
     flux = build_lineprofile(metric, x_obs, ring, r_grid, g_grid,
-    emissivity_num_traces = 50000,
-    tf_max_points = 100,
-    n_threads = 16,
-    gamma_index = Γ,      # photon index Γ of illuminating spectrum
-    beaming_exponent = 3.0)
+                            emissivity_num_traces = 5000,
+                            tf_max_points = 100,
+                            n_threads = 4,
+                            gamma_index = Γ,      # photon index Γ of illuminating spectrum
+                            beaming_exponent = 3.0)
     
     dg = sum(diff(g_grid))/length(diff(g_grid))
     total = sum(flux) * dg

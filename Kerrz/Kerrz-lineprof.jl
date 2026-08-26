@@ -34,10 +34,11 @@ end
 
 function SpectralFitting.invoke!(output, domain, model::RingCoronaLineKerrz)
     cur_dir = pwd()
-    #kerrz = "/Users/er19801/kerrz/zig-out/bin/kerrz"
-    kerrz = "/data/typhon2/DariusM/kerrz/zig-out/bin/kerrz"
+    kerrz = "/Users/er19801/kerrz/zig-out/bin/kerrz"
+    #kerrz = "/data/typhon2/DariusM/kerrz/zig-out/bin/kerrz"
     ID = Threads.threadid()
     emisivity_out_file = "Kerrz/Table/emsvty_g$(model.Γ)_h$(model.h)_r$(model.r).dat"
+    emisivity_out_file = "emsvty_g$(model.Γ)_h$(model.h)_r$(model.r).dat"
     #lineprof_out_file = "lineprof_ID$(ID)_g$(model.Γ)_h$(model.h)_r$(model.r)_th$(model.θ)_a$(model.a).dat"
     lineprof_out_file = "lineprof_ID$(rand(10^9:10^10 - 1)).dat"
 
@@ -56,15 +57,16 @@ function SpectralFitting.invoke!(output, domain, model::RingCoronaLineKerrz)
     end 
 
     #println("Writing Emissivity")
-    #run(`$kerrz emissivity --velocity corotate --photon-index $(model.Γ) --nthreads $(Threads.nthreads()) --ring-like h:$(model.h),x:$(model.r) --output $cur_dir/$emisivity_out_file`)
-    
+    run(`$kerrz emissivity --velocity corotate --photon-index $(model.Γ) --nthreads $(Threads.nthreads()) --ring-like h:$(model.h),x:$(model.r) --output $cur_dir/$emisivity_out_file`)
+    #run(`$kerrz emissivity --photon-index $(model.Γ) --nthreads $(Threads.nthreads()) --ring-like h:$(model.h),x:$(model.r) --output $cur_dir/$emisivity_out_file`)
+
     println("Writing LineProf")
-    run(`$kerrz lineprof  --nradii 100 --nangles 200 --spin $(model.a) --incl $(model.θ) --ng $domain_size --rin $R_In --rout $R_Out --emissivity-profile  $cur_dir/$emisivity_out_file --output $cur_dir/$lineprof_out_file`)
+    run(`$kerrz lineprof  --nradii 1000 --nangles 200 --spin $(model.a) --incl $(model.θ) --ng $domain_size --rin $R_In --rout $R_Out --emissivity-profile  $cur_dir/$emisivity_out_file --output $cur_dir/$lineprof_out_file`)
 
     
 
 
-    #rm("$cur_dir/$emisivity_out_file")
+    rm("$cur_dir/$emisivity_out_file")
     
     lineprof = parse.(Float64,reduce(hcat, split.(readlines(lineprof_out_file),", ")))
     
