@@ -1,0 +1,19 @@
+# macOS / editor
+.DS_Store
+.vscode/
+
+# Python venv at the repo root
+/bin/
+/lib/
+/include/
+/pyvenv.cfg
+
+# R
+.RData
+.Rhistory
+
+# Local data and generated files (root only; nested fixtures can still be tracked)
+/*.fits
+*.pgm
+fort.*
+output.pgm

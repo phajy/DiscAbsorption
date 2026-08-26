@@ -1,0 +1,33 @@
+.{
+    .name = .kerrz,
+    .fingerprint = 0xde9489184b677b0e,
+    .version = "0.3.4",
+    .minimum_zig_version = "0.15.2",
+    .dependencies = .{
+        .clippy = .{
+            .url = "git+https://codeberg.org/fjebaker/clippy?ref=0.15.2#1f5251d2b42bbc8f3fabcd677fa7dda67bca69ae",
+            .hash = "clippy-0.4.1-BgbUoN2JAQDoerrHymFWtw97Pl34AVq798RMOyQUkfMO",
+        },
+        .zad = .{
+            .url = "git+https://git.sr.ht/~fjebaker/zad#42a1bb711079ff3686ba50dd5411cfe6b831574e",
+            .hash = "zad-0.0.0-oqufjRtyAAB0KVWQZ6uFdH69r9PtGUFQls8Yqv-n6ART",
+        },
+        .rootsolve = .{
+            .url = "git+https://codeberg.org/fjebaker/rootsolve#44d80965bd849fd6c6806b0890d0d558bf252ef8",
+            .hash = "rootsolve-0.0.0-b8oVchlUAADH-J0JRhhCSUdCAzI4kbNu06kmzkQiTBz3",
+        },
+        .zfits = .{
+            .url = "git+https://codeberg.org/fjebaker/zfits?ref=0.15.2#91a780063117c345aad7f8d8ca03f6b311810949",
+            .hash = "zfits-0.0.0-gXqorzouAQDWJw-NqQ4s7ZR6M3C1dCzDcaTMdq3sR9nN",
+        },
+        .dinterp = .{
+            .url = "git+https://codeberg.org/astro-group/dinterp#2ce4d4172e0b21b2ed0ad05daf92fcd5d92a11b5",
+            .hash = "dinterp-0.0.0-ZbDPpxdiAAD8BeuXNOCYbnwlIR75FTug3smQ4xY44_k6",
+        },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+    },
+}

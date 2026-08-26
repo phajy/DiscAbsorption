@@ -1,0 +1,14 @@
+# Zig build products and cache
+.zig-cache/
+zig-out/
+
+# Local copies of Zig dependencies (fetched via build.zig.zon)
+zig-pkg/
+
+# Precomputed emissivity grids (regenerate with scripts/precompute_emissivity.sh)
+emissivity/
+
+# CLI / test run artifacts
+*.dat
+emissivity.fits
+shadow.test
