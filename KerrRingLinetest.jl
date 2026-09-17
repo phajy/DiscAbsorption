@@ -1,5 +1,3 @@
-using Plots
-
 # Ring-corona line profile via the file-based kerrz C API
 # (`krz_tool_Lineprofile_run`). Loads a precomputed emissivity FITS file,
 # builds transfer functions, and returns (g, flux) in memory.
@@ -23,6 +21,8 @@ using Plots
 # arg-parser source for the `emissivity` command to confirm the exact ring
 # key names. Run `kerrz emissivity --help` once and adjust the single `run(...)`
 # line in `ensure_emissivity_ring` below if the real syntax differs.
+
+using SpectralFitting
 
 const kerrz_root = joinpath(@__DIR__, "kerrz-modified")
 const libkerrz = joinpath(kerrz_root, "zig-out", "lib", "libkerrz.dylib")
@@ -107,10 +107,10 @@ still avoiding collisions if you later sweep those too.
 """
 function ring_emissivity_path(a, h, r; photon_index::Float64 = 2.0,
                               velocity::Symbol = :co_rotate,
-                              nphotons::Integer = 3000)
+                              nphotons::Integer = 500000)
     gtag = photon_index == 2.0 ? "" : "_g$(_num_str(photon_index))"
     vtag = velocity === :co_rotate ? "" : "_v$(velocity)"
-    ntag = nphotons == 3000 ? "" : "_n$(nphotons)"
+    ntag = nphotons == 500000 ? "" : "_n$(nphotons)"
     joinpath(ring_emissivity_dir,
              "emis_ring_a$(a)_h$(_num_str(h))_r$(_num_str(r))$(gtag)$(vtag)$(ntag).fits")
 end
@@ -126,7 +126,7 @@ every run.
 """
 function ensure_emissivity_ring(a, h, r; photon_index::Float64 = 2.0,
                                 velocity::Symbol = :co_rotate,
-                                nphotons::Integer = 3000)
+                                nphotons::Integer = 500000)
     path = ring_emissivity_path(a, h, r; photon_index, velocity, nphotons)
     isfile(path) && return path
     isfile(kerrz_cli) || error(
@@ -242,14 +242,15 @@ end
 # lamppost's single height — so the "size" axis below pairs the two rather
 # than sweeping either alone. Adjust these pairings to whatever geometries
 # you actually care about.
-spins = [0.01, 0.7, 0.998]
+#=N = 500000
+spins = [0.1, 0.7, 0.998]
 ring_geometries = [(height = 3.0, radius = 1.5),
                     (height = 8.0, radius = 3.0),
                     (height = 20.0, radius = 5.0)]
 thetas = [5, 30, 60, 85]
 
 for a in spins, geo in ring_geometries
-    ensure_emissivity_ring(a, geo.height, geo.radius)
+    ensure_emissivity_ring(a, geo.height, geo.radius; nphotons = N)
 end
 
 panels = Plots.Plot[]
@@ -259,7 +260,7 @@ for (i, geo) in enumerate(ring_geometries)
                  legend = (i == 1 && j == 1) ? :topright : false,
                  xlims = (0, 2))
         for θ in thetas
-            fits = ring_emissivity_path(a, geo.height, geo.radius)
+            fits = ring_emissivity_path(a, geo.height, geo.radius, ; nphotons = N)
             profile = @time build_lineprofile(fits; a = Float64(a), θ = Float64(θ))
             plot!(p, profile.g, profile.flux; label = "θ = $(θ)°")
         end
@@ -272,4 +273,111 @@ end
 plot(panels...;
      layout = (length(ring_geometries), length(spins)),
      size = (1400, 1000),
-     plot_title = "Ring-corona line profiles")
+     plot_title = "Ring-corona line profiles")=#
+
+
+struct RingCoronaLineKerrz_mod{T} <: AbstractSpectralModel{T,Additive}
+    "Normalisation"
+    K::T
+    "Ring Radius"
+    r::T
+    "Ring Height"
+    h::T
+    "Photon Index"
+    Γ::T
+    "Inner Radius"
+    R_in::T
+    "Outer Radius"
+    R_out::T
+    "Inclination"
+    θ::T
+    "Spin"
+    a::T
+end
+
+function RingCoronaLineKerrz_mod(;K = FitParam(1.0),
+    r = FitParam(2.,lower_limit = 1.5, upper_limit = 10., frozen = false),
+    h = FitParam(2.,lower_limit = 1.5, upper_limit = 50., frozen = false),
+    Γ = FitParam(2.3,lower_limit = 1.0, upper_limit = 3., frozen = false),
+    R_in = FitParam(0,lower_limit= -Inf,frozen = true),
+    R_out = FitParam(400., lower_limit=-Inf, frozen = true), 
+    θ = FitParam(30.,lower_limit=7,upper_limit=85),
+    a = FitParam(0.998,lower_limit=-0.998,upper_limit=0.998))
+    RingCoronaLineKerrz_mod(K, r, h, Γ, R_in, R_out, θ, a)
+end
+
+function SpectralFitting.invoke!(output, domain, model::RingCoronaLineKerrz_mod)
+    g_domain = copy(domain)
+    domain_size = length(g_domain)-1
+
+    ensure_emissivity_ring(model.a, model.h, model.r, photon_index = model.Γ)
+    fits = ring_emissivity_path(model.a, model.h, model.r, photon_index = model.Γ)
+    profile = build_lineprofile(fits; a = model.a, θ = model.θ, r_in = model.R_in, r_out = model.R_out, ng=domain_size)
+    
+    output .= profile.flux
+end
+
+#ring corona full 
+
+struct FullModelRingKerrz_mod{T} <: AbstractSpectralModel{T,Additive}
+    "Normalisation"
+    K::T
+    "Ring Radius"
+    r::T
+    "Ring Height"
+    h::T
+    "Inner Radius"
+    R_in::T
+    "Outer Radius"
+    R_out::T
+    "Inclination"
+    θ::T
+    "Spin"
+    a::T
+    "Photon Index"
+    Γ::T
+    "Iron Abundance"
+    A_Fe::T
+    "Ionisation Parameter"
+    logXi::T
+    "density"
+    density::T
+end
+
+function FullModelRingKerrz_mod(;K = FitParam(1.0),
+    r = FitParam(5.,lower_limit = 1.5, upper_limit = 100., frozen = false),
+    h = FitParam(5.,lower_limit = 1.5, upper_limit = 100., frozen = false),
+    R_in = FitParam(0.,lower_limit= -Inf,frozen = true),
+    R_out = FitParam(Inf, lower_limit=-Inf, frozen = true), 
+    θ = FitParam(30.,lower_limit=7,upper_limit=85, frozen = false),
+    a = FitParam(0.7,lower_limit=0.0,upper_limit=0.998, frozen = false),
+    Γ = FitParam(2.3,lower_limit = 1, upper_limit = 3., frozen = false),
+    A_Fe = FitParam(1.0,lower_limit = 0.1, upper_limit = 100., frozen = true),
+    logXi = FitParam(3.0,lower_limit= 2., upper_limit = 4.,frozen = false),
+    density = FitParam(17., lower_limit=15., upper_limit=19., frozen = false))
+    FullModelRingKerrz_mod(K,r,h,R_in,R_out,θ,a,Γ,A_Fe,logXi,density)
+end
+
+function SpectralFitting.invoke!(output, domain, model::FullModelRingKerrz_mod)
+    convmodel = RingCoronaLineKerrz_mod(
+    K = FitParam(1.0),
+    r = FitParam(model.r),
+    h = FitParam(model.h),
+    Γ = FitParam(model.Γ),
+    R_in = FitParam(model.R_in),
+    R_out = FitParam(model.R_out), 
+    θ = FitParam(model.θ),
+    a = FitParam(model.a))
+    
+    specmodel = XillverD5(
+    K = FitParam(model.K),
+    Γ = FitParam(model.Γ),
+    A_Fe = FitParam(model.A_Fe),
+    logXi = FitParam(model.logXi),
+    density = FitParam(model.density), 
+    inclination = FitParam(model.θ))
+        
+    convolution_model = AsConvolution(convmodel)
+    Fmodel = convolution_model(specmodel)
+    output .= invokemodel(domain,Fmodel)
+end
