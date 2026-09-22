@@ -1,8 +1,8 @@
 using XSPECModels, Relxill, CFITSIO, Plots, Base.Threads, Statistics
 
-t1 = time()
 include("KerrRingLinetest.jl")
 Threads.nthreads() = 8
+nthreads = Threads.nthreads()
 min_grp_size = 100
 
 NumbVals = [3, 3, 3, 3, 3, 3, 3, 3]
@@ -176,24 +176,48 @@ for chunk in chunks_free
     
     # Pre-allocate buffer for this chunk's results
     chunk_results = Vector{Vector{Float64}}(undef, n_in_chunk)
-    
+
+    # CHANGED: pool of independent model instances handed out via a Channel,
+    # instead of indexing by Threads.threadid() (which is not guaranteed to
+    # be a contiguous 1:nthreads range and caused the BoundsError).
+    n_workers = Threads.nthreads(:default) + Threads.nthreads(:interactive)
+    model_pool = Channel{FullModelRingKerrz_mod{FitParam{Float64}}}(n_workers)
+    for _ in 1:n_workers
+        put!(model_pool, deepcopy(FullModelRingKerrz_mod(
+            r = FitParam(0.0), h = FitParam(0.0), Γ = FitParam(0.0),
+            R_in = FitParam(frozen_param_values[1]),
+            R_out = FitParam(frozen_param_values[2]),
+            θ = FitParam(0.0), a = FitParam(0.0), A_Fe = FitParam(0.0),
+            logXi = FitParam(0.0), density = FitParam(0.0),
+        )))
+    end
+
     # Compute spectra in parallel within the chunk
     Threads.@threads for local_idx in 1:n_in_chunk
         j = chunk_indices[local_idx]
-        ps = iter_params[j]        
-        local_model = FullModelRingKerrz_mod(
-                r = FitParam(ps[5]),
-                h = FitParam(ps[6]),
-                Γ = FitParam(ps[8]),
-                R_in = FitParam(frozen_param_values[1]),
-                R_out = FitParam(frozen_param_values[2]), 
-                θ = FitParam(ps[1]),
-                a = FitParam(ps[7]),
-                A_Fe = FitParam(ps[2]),
-                logXi = FitParam(ps[3]),
-                density = FitParam(ps[4]),)
-        chunk_results[local_idx] = invokemodel(Energies, local_model).parent[:, 1]
+        ps = iter_params[j]
+
+        # CHANGED: check a model out of the pool instead of thread_models[tid]
+        m = take!(model_pool)
+        try
+            m = FullModelRingKerrz_mod(
+                    r = FitParam(ps[5]),
+                    h = FitParam(ps[6]),
+                    Γ = FitParam(ps[8]),
+                    R_in = FitParam(frozen_param_values[1]),
+                    R_out = FitParam(frozen_param_values[2]), 
+                    θ = FitParam(ps[1]),
+                    a = FitParam(ps[7]),
+                    A_Fe = FitParam(ps[2]),
+                    logXi = FitParam(ps[3]),
+                    density = FitParam(ps[4]),)
+            chunk_results[local_idx] = invokemodel(Energies, m).parent[:, 1]
+        finally
+            # CHANGED: always return the model to the pool, even on error
+            put!(model_pool, m)
+        end
     end
+    close(model_pool)
     
     # Write results serially (thread-safe)
     for local_idx in 1:n_in_chunk
@@ -209,4 +233,3 @@ fits_write_key(f,"HDUCLAS2", "MODEL SPECTRA", "")
 fits_write_key(f,"HDUVERS", "1.0.0", "format version")
 close(f)
 #54145.161617 seconds
-
