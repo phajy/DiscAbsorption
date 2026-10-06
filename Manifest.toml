@@ -2,7 +2,7 @@
 
 julia_version = "1.13.0"
 manifest_format = "2.1"
-project_hash = "5d9b88a42150742a5a853246f6d71ddd688ddfdb"
+project_hash = "77e76b3c9f467562ad1627837cb689b4a69cef23"
 
 [[deps.ADTypes]]
 deps = ["PrecompileTools"]
@@ -750,6 +750,20 @@ deps = ["Artifacts", "CompilerSupportLibraries_jll", "Libdl", "OpenSSL_jll", "Zl
 uuid = "29816b5a-b9ab-546f-933c-edad1886dfa8"
 version = "1.11.103+0"
 
+[[deps.LibXSPEC_Relxill_jll]]
+deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "LibXSPEC_jll", "Libdl"]
+git-tree-sha1 = "502c854ae66bf7dfbb4e8320e1729361800a719b"
+registries = "AstroRegistry"
+uuid = "e5636fd8-dfb6-572c-a65b-f91a4431b0da"
+version = "0.2.4+0"
+
+[[deps.LibXSPEC_jll]]
+deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl", "Ncurses_jll", "Zlib_jll"]
+git-tree-sha1 = "02640a8ea7b390a8c12d813829bf5d858945ff3c"
+registries = "AstroRegistry"
+uuid = "50917eeb-3e3c-5f3a-99bd-93e1c30e1561"
+version = "6.35.1+1"
+
 [[deps.Libdl]]
 uuid = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
 version = "1.11.0"
@@ -850,6 +864,13 @@ git-tree-sha1 = "dbd2e8cd2c1c27f0b584f6661b4309609c5a685e"
 registries = "General"
 uuid = "77ba4419-2d1f-58cd-9bb1-8ffee604a2e3"
 version = "1.1.4"
+
+[[deps.Ncurses_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "095850bc2a585bb20cad8d8f6f9f643d11b49a3d"
+registries = "General"
+uuid = "68e3532b-a499-55ff-9963-d1c0c0748b3a"
+version = "6.6.0+2"
 
 [[deps.NetworkOptions]]
 uuid = "ca575930-c2e3-43a9-ace4-1e988b2c1908"
@@ -1164,6 +1185,13 @@ git-tree-sha1 = "45e428421666073eab6f2da5c9d310d99bb12f9b"
 registries = "General"
 uuid = "189a3867-3050-52da-a836-e630ba90ab69"
 version = "1.2.2"
+
+[[deps.Relxill]]
+deps = ["LibXSPEC_Relxill_jll", "LibXSPEC_jll", "SpectralFitting", "XSPECModels"]
+git-tree-sha1 = "24dd1fc42a4405a3439a916d2e9cfdaed8a839c0"
+registries = "AstroRegistry"
+uuid = "b6389841-9bc2-481d-a2e0-8b38b8d5f21d"
+version = "0.2.4"
 
 [[deps.Requires]]
 deps = ["UUIDs"]
@@ -1662,6 +1690,13 @@ git-tree-sha1 = "248a7031b3da79a127f14e5dc5f417e26f9f6db7"
 registries = "General"
 uuid = "efce3f68-66dc-5838-9240-27a6d6f5f9b6"
 version = "1.1.0"
+
+[[deps.XSPECModels]]
+deps = ["DocStringExtensions", "LibXSPEC_jll", "SpectralFitting"]
+git-tree-sha1 = "5f75d54fcfdf60d32e3def94f96838ae56a1a64a"
+registries = "AstroRegistry"
+uuid = "e051c099-9e89-4e1f-aad2-39a4611ecf4d"
+version = "0.2.4"
 
 [[deps.Zlib_jll]]
 deps = ["Libdl"]
