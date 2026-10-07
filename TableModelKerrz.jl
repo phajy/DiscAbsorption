@@ -1,4 +1,4 @@
-using XSPECModels, Relxill, CFITSIO, Plots, Base.Threads, Statistics
+using CFITSIO, Statistics, Relxill
 
 include("KerrRingLinetest.jl")
 Threads.nthreads() = 8
